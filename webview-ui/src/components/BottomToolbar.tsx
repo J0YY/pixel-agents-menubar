@@ -1,14 +1,19 @@
 import { useState, useEffect, useRef } from 'react'
 import { SettingsModal } from './SettingsModal.js'
-import type { WorkspaceFolder } from '../hooks/useExtensionMessages.js'
+import type { HostContext, WorkspaceFolder } from '../hooks/useExtensionMessages.js'
 import { vscode } from '../vscodeApi.js'
 
 interface BottomToolbarProps {
+  hostContext: HostContext
   isEditMode: boolean
+  isTerminalPanelOpen: boolean
   onOpenClaude: () => void
+  onOpenCodex: () => void
+  onOpenTerminalPanel: () => void
   onToggleEditMode: () => void
   isDebugMode: boolean
   onToggleDebugMode: () => void
+  terminalSessionCount: number
   workspaceFolders: WorkspaceFolder[]
 }
 
@@ -45,11 +50,16 @@ const btnActive: React.CSSProperties = {
 
 
 export function BottomToolbar({
+  hostContext,
   isEditMode,
+  isTerminalPanelOpen,
   onOpenClaude,
+  onOpenCodex,
+  onOpenTerminalPanel,
   onToggleEditMode,
   isDebugMode,
   onToggleDebugMode,
+  terminalSessionCount,
   workspaceFolders,
 }: BottomToolbarProps) {
   const [hovered, setHovered] = useState<string | null>(null)
@@ -73,7 +83,7 @@ export function BottomToolbar({
   const hasMultipleFolders = workspaceFolders.length > 1
 
   const handleAgentClick = () => {
-    if (hasMultipleFolders) {
+    if (hostContext.mode === 'vscode' && hasMultipleFolders) {
       setIsFolderPickerOpen((v) => !v)
     } else {
       onOpenClaude()
@@ -103,7 +113,7 @@ export function BottomToolbar({
             color: 'var(--pixel-agent-text)',
           }}
         >
-          + Agent
+          {hostContext.mode === 'desktop' ? '+ Claude' : '+ Agent'}
         </button>
         {isFolderPickerOpen && (
           <div
@@ -146,6 +156,40 @@ export function BottomToolbar({
           </div>
         )}
       </div>
+      {hostContext.mode === 'desktop' && hostContext.canLaunchCodex && (
+        <button
+          onClick={onOpenCodex}
+          onMouseEnter={() => setHovered('codex')}
+          onMouseLeave={() => setHovered(null)}
+          style={{
+            ...btnBase,
+            padding: '5px 12px',
+            background: hovered === 'codex' ? 'var(--pixel-agent-hover-bg)' : 'var(--pixel-agent-bg)',
+            border: '2px solid var(--pixel-agent-border)',
+            color: 'var(--pixel-agent-text)',
+          }}
+        >
+          + Codex
+        </button>
+      )}
+      {hostContext.mode === 'desktop' && hostContext.canManageTerminals && (
+        <button
+          onClick={onOpenTerminalPanel}
+          onMouseEnter={() => setHovered('terminals')}
+          onMouseLeave={() => setHovered(null)}
+          style={
+            isTerminalPanelOpen
+              ? { ...btnActive }
+              : {
+                  ...btnBase,
+                  background: hovered === 'terminals' ? 'var(--pixel-btn-hover-bg)' : btnBase.background,
+                }
+          }
+          title="View detected terminal sessions"
+        >
+          {terminalSessionCount > 0 ? `Terminals ${terminalSessionCount}` : 'Terminals'}
+        </button>
+      )}
       <button
         onClick={onToggleEditMode}
         onMouseEnter={() => setHovered('edit')}
@@ -180,6 +224,7 @@ export function BottomToolbar({
           Settings
         </button>
         <SettingsModal
+          hostContext={hostContext}
           isOpen={isSettingsOpen}
           onClose={() => setIsSettingsOpen(false)}
           isDebugMode={isDebugMode}

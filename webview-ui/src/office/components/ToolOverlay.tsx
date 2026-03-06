@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react'
 import type { ToolActivity } from '../types.js'
 import type { OfficeState } from '../engine/officeState.js'
-import type { SubagentCharacter } from '../../hooks/useExtensionMessages.js'
+import type { AgentCapabilities, SubagentCharacter } from '../../hooks/useExtensionMessages.js'
 import { TILE_SIZE, CharacterState } from '../types.js'
 import { TOOL_OVERLAY_VERTICAL_OFFSET, CHARACTER_SITTING_OFFSET_PX } from '../../constants.js'
 
 interface ToolOverlayProps {
   officeState: OfficeState
   agents: number[]
+  agentCapabilities: Record<number, AgentCapabilities>
+  agentStatuses: Record<number, string>
   agentTools: Record<number, ToolActivity[]>
   subagentCharacters: SubagentCharacter[]
   containerRef: React.RefObject<HTMLDivElement | null>
@@ -19,6 +21,7 @@ interface ToolOverlayProps {
 /** Derive a short human-readable activity string from tools/status */
 function getActivityText(
   agentId: number,
+  agentStatuses: Record<number, string>,
   agentTools: Record<number, ToolActivity[]>,
   isActive: boolean,
 ): string {
@@ -37,12 +40,31 @@ function getActivityText(
     }
   }
 
-  return 'Idle'
+  switch (agentStatuses[agentId]) {
+    case 'done':
+      return 'Done'
+    case 'idle':
+      return 'Idle'
+    case 'reading':
+      return 'Reading'
+    case 'running':
+      return 'Running'
+    case 'thinking':
+      return 'Thinking'
+    case 'waiting_input':
+      return 'Waiting for input'
+    case 'writing':
+      return 'Writing'
+    default:
+      return isActive ? 'Active' : 'Idle'
+  }
 }
 
 export function ToolOverlay({
   officeState,
   agents,
+  agentCapabilities,
+  agentStatuses,
   agentTools,
   subagentCharacters,
   containerRef,
@@ -108,7 +130,7 @@ export function ToolOverlay({
             activityText = sub ? sub.label : 'Subtask'
           }
         } else {
-          activityText = getActivityText(id, agentTools, ch.isActive)
+          activityText = getActivityText(id, agentStatuses, agentTools, ch.isActive)
         }
 
         // Determine dot color
@@ -116,11 +138,15 @@ export function ToolOverlay({
         const hasPermission = subHasPermission || tools?.some((t) => t.permissionWait && !t.done)
         const hasActiveTools = tools?.some((t) => !t.done)
         const isActive = ch.isActive
+        const status = agentStatuses[id]
+        const canClose = Boolean(agentCapabilities[id]?.closable)
 
         let dotColor: string | null = null
         if (hasPermission) {
           dotColor = 'var(--pixel-status-permission)'
-        } else if (isActive && hasActiveTools) {
+        } else if (status === 'waiting_input') {
+          dotColor = 'var(--pixel-status-permission)'
+        } else if (isActive && (hasActiveTools || status === 'running' || status === 'thinking' || status === 'reading' || status === 'writing')) {
           dotColor = 'var(--pixel-status-active)'
         }
 
@@ -194,7 +220,7 @@ export function ToolOverlay({
                   </span>
                 )}
               </div>
-              {isSelected && !isSub && (
+              {isSelected && !isSub && canClose && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation()

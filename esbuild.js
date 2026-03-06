@@ -47,7 +47,7 @@ const esbuildProblemMatcherPlugin = {
 };
 
 async function main() {
-	const ctx = await esbuild.context({
+	const extensionCtx = await esbuild.context({
 		entryPoints: [
 			'src/extension.ts'
 		],
@@ -65,11 +65,47 @@ async function main() {
 			esbuildProblemMatcherPlugin,
 		],
 	});
+	const desktopMainCtx = await esbuild.context({
+		entryPoints: ['src/desktop/main.ts'],
+		bundle: true,
+		format: 'cjs',
+		minify: production,
+		sourcemap: !production,
+		sourcesContent: false,
+		platform: 'node',
+		outfile: 'dist/desktop/main.js',
+		external: ['electron'],
+		logLevel: 'silent',
+		plugins: [esbuildProblemMatcherPlugin],
+	});
+	const desktopPreloadCtx = await esbuild.context({
+		entryPoints: ['src/desktop/preload.ts'],
+		bundle: true,
+		format: 'cjs',
+		minify: production,
+		sourcemap: !production,
+		sourcesContent: false,
+		platform: 'node',
+		outfile: 'dist/desktop/preload.js',
+		external: ['electron'],
+		logLevel: 'silent',
+		plugins: [esbuildProblemMatcherPlugin],
+	});
 	if (watch) {
-		await ctx.watch();
+		await Promise.all([
+			extensionCtx.watch(),
+			desktopMainCtx.watch(),
+			desktopPreloadCtx.watch(),
+		]);
 	} else {
-		await ctx.rebuild();
-		await ctx.dispose();
+		await extensionCtx.rebuild();
+		await desktopMainCtx.rebuild();
+		await desktopPreloadCtx.rebuild();
+		await Promise.all([
+			extensionCtx.dispose(),
+			desktopMainCtx.dispose(),
+			desktopPreloadCtx.dispose(),
+		]);
 		// Copy assets after build
 		copyAssets();
 	}

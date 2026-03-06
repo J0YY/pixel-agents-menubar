@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { vscode } from '../vscodeApi.js'
 import { isSoundEnabled, setSoundEnabled } from '../notificationSound.js'
+import type { HostContext } from '../hooks/useExtensionMessages.js'
 
 interface SettingsModalProps {
+  hostContext: HostContext
   isOpen: boolean
   onClose: () => void
   isDebugMode: boolean
@@ -24,7 +26,7 @@ const menuItemBase: React.CSSProperties = {
   textAlign: 'left',
 }
 
-export function SettingsModal({ isOpen, onClose, isDebugMode, onToggleDebugMode }: SettingsModalProps) {
+export function SettingsModal({ hostContext, isOpen, onClose, isDebugMode, onToggleDebugMode }: SettingsModalProps) {
   const [hovered, setHovered] = useState<string | null>(null)
   const [soundLocal, setSoundLocal] = useState(isSoundEnabled)
 
@@ -190,6 +192,21 @@ export function SettingsModal({ isOpen, onClose, isDebugMode, onToggleDebugMode 
             />
           )}
         </button>
+        {hostContext.mode === 'desktop' && (
+          <button
+            onClick={() => {
+              vscode.postMessage({ type: 'quitApp' })
+            }}
+            onMouseEnter={() => setHovered('quit')}
+            onMouseLeave={() => setHovered(null)}
+            style={{
+              ...menuItemBase,
+              background: hovered === 'quit' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+            }}
+          >
+            Quit Pixel Agents
+          </button>
+        )}
       </div>
     </>
   )

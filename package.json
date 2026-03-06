@@ -6,12 +6,35 @@
   "publisher": "pablodelucca",
   "repository": {
     "type": "git",
-    "url": "https://github.com/pablodelucca/pixel-agents"
+    "url": "https://github.com/J0YY/pixel-agents-menubar"
   },
   "icon": "icon.png",
   "license": "MIT",
   "engines": {
     "vscode": "^1.107.0"
+  },
+  "build": {
+    "appId": "com.pixelagents.menubar",
+    "asar": true,
+    "directories": {
+      "output": "dist-desktop"
+    },
+    "files": [
+      "dist/**/*",
+      "build/icon.png",
+      "icon.png",
+      "package.json"
+    ],
+    "extraMetadata": {
+      "main": "dist/desktop/main.js"
+    },
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "icon": "build/icon.png",
+      "target": [
+        "dir"
+      ]
+    }
   },
   "categories": [
     "Other"
@@ -46,6 +69,42 @@
           "name": "Pixel Agents"
         }
       ]
+    },
+    "configuration": {
+      "title": "Pixel Agents",
+      "properties": {
+        "pixelAgents.externalTracking.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable detection of Claude Code and Codex sessions running in external macOS terminal windows."
+        },
+        "pixelAgents.externalTracking.scanIntervalMs": {
+          "type": "number",
+          "default": 3000,
+          "minimum": 1000,
+          "description": "Polling interval in milliseconds for scanning external macOS terminal agent processes."
+        },
+        "pixelAgents.externalTracking.enableClaude": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable detection of external Claude Code sessions."
+        },
+        "pixelAgents.externalTracking.enableCodex": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable detection of external Codex sessions."
+        },
+        "pixelAgents.externalTracking.enableTranscriptCorrelation": {
+          "type": "boolean",
+          "default": true,
+          "description": "When possible, correlate external Claude processes with transcript files to improve activity detection."
+        },
+        "pixelAgents.logging.debug": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable verbose Pixel Agents debug logging in the extension host."
+        }
+      }
     }
   },
   "scripts": {
@@ -53,6 +112,8 @@
     "build:webview": "cd webview-ui && npm run build",
     "compile": "npm run check-types && npm run lint && node esbuild.js && npm run build:webview",
     "build": "npm run compile",
+    "menubar": "npm run compile && electron dist/desktop/main.js",
+    "menubar:pack": "npm run compile && electron-builder --mac dir",
     "watch": "npm-run-all -p watch:*",
     "watch:esbuild": "node esbuild.js --watch",
     "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
@@ -66,6 +127,8 @@
     "@types/node": "22.x",
     "@types/pngjs": "^6.0.5",
     "@types/vscode": "^1.107.0",
+    "electron": "^35.1.4",
+    "electron-builder": "^25.1.8",
     "esbuild": "^0.27.2",
     "eslint": "^9.39.2",
     "npm-run-all": "^4.1.5",

@@ -1,18 +1,21 @@
 # Pixel Agents
 
-A VS Code extension that turns your AI coding agents into animated pixel art characters in a virtual office.
+A pixel-art control room for your AI coding agents, available both as a VS Code extension and as a standalone macOS menubar app.
 
-Each Claude Code terminal you open spawns a character that walks around, sits at desks, and visually reflects what the agent is doing — typing when writing code, reading when searching files, waiting when it needs your attention.
+Each active Claude Code or Codex session can spawn a character that walks around, sits at desks, and visually reflects what the agent is doing — typing when writing code, reading when searching files, waiting when it needs your attention.
 
-This is the source code for the free [Pixel Agents extension for VS Code](https://marketplace.visualstudio.com/items?itemName=pablodelucca.pixel-agents) — you can install it directly from the marketplace with the full furniture catalog included.
+This repository contains the original [Pixel Agents extension for VS Code](https://marketplace.visualstudio.com/items?itemName=pablodelucca.pixel-agents) plus a new standalone desktop host for people who want Pixel Agents running without an IDE.
 
 
 ![Pixel Agents screenshot](webview-ui/public/Screenshot.jpg)
 
 ## Features
 
-- **One agent, one character** — every Claude Code terminal gets its own animated character
+- **One agent, one character** — every active Claude Code or Codex session gets its own animated character
 - **Live activity tracking** — characters animate based on what the agent is actually doing (writing, reading, running commands)
+- **Standalone macOS menubar app** — run Pixel Agents without VS Code and keep it watching your terminal sessions from the menu bar
+- **External terminal support on macOS** — detect Claude Code and Codex sessions running in normal terminal windows outside VS Code
+- **Terminal session manager** — inspect detected terminal-backed shell/agent sessions, focus them, and end them from the desktop app
 - **Office layout editor** — design your office with floors, walls, and furniture using a built-in editor
 - **Speech bubbles** — visual indicators when an agent is waiting for input or needs permission
 - **Sound notifications** — optional chime when an agent finishes its turn
@@ -26,32 +29,105 @@ This is the source code for the free [Pixel Agents extension for VS Code](https:
 
 ## Requirements
 
-- VS Code 1.109.0 or later
-- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) installed and configured
+- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) installed and configured if you want Claude characters
+- VS Code 1.109.0 or later if you want to use the extension host
+- macOS is currently the only platform with external terminal process tracking
 
 ## Getting Started
 
-If you just want to use Pixel Agents, the easiest way is to download the [VS Code extension](https://marketplace.visualstudio.com/items?itemName=pablodelucca.pixel-agents). If you want to play with the code, develop, or contribute, then:
+If you want to hack on the project, run the extension locally, or use the new desktop host from source:
 
 ### Install from source
 
 ```bash
-git clone https://github.com/pablodelucca/pixel-agents.git
-cd pixel-agents
+git clone https://github.com/J0YY/pixel-agents-menubar.git
+cd pixel-agents-menubar
 npm install
 cd webview-ui && npm install && cd ..
 npm run build
 ```
 
-Then press **F5** in VS Code to launch the Extension Development Host.
+### Run the VS Code extension
+
+Press **F5** in VS Code to launch the Extension Development Host.
+
+### Run the standalone menubar app on macOS
+
+```bash
+npm run menubar
+```
+
+This starts Pixel Agents as a tray/menubar app with the same office UI, external agent detection, and layout persistence, but without VS Code.
+
+To build a packaged `.app` bundle:
+
+```bash
+npm run menubar:pack
+```
 
 ### Usage
 
+### VS Code mode
+
 1. Open the **Pixel Agents** panel (it appears in the bottom panel area alongside your terminal)
 2. Click **+ Agent** to spawn a new Claude Code terminal and its character
-3. Start coding with Claude — watch the character react in real time
-4. Click a character to select it, then click a seat to reassign it
-5. Click **Layout** to open the office editor and customize your space
+3. Start coding with Claude and watch the character react in real time
+4. On macOS, external Claude Code and Codex sessions launched from Terminal, iTerm, Warp, or other normal terminal apps will also appear automatically when external tracking is enabled
+5. Click a character to select it, then click a seat to reassign it
+6. Click **Layout** to open the office editor and customize your space
+
+### Desktop mode
+
+1. Launch `npm run menubar` or open the packaged Pixel Agents app
+2. Click the tray/menubar icon to show the office
+3. Use **+ Claude** or **+ Codex** to open new agent sessions in Terminal.app
+4. Use **Terminals** to inspect detected terminal-backed sessions running on your Mac
+5. Focus or end detected shell/agent sessions directly from the desktop app
+6. Close the window to send Pixel Agents back to the menu bar
+
+## Standalone Menubar App
+
+The new desktop host reuses the same agent registry and process/transcript tracking layers as the extension, but runs them under Electron instead of the VS Code extension host.
+
+Desktop mode currently supports:
+
+- Detecting external Claude Code and Codex sessions from ordinary macOS terminal apps
+- Launching new Claude, Codex, or plain shell sessions from the menubar UI
+- Showing one pixel character per active agent session even when VS Code is closed
+- Listing terminal-backed shell/agent sessions in a terminal manager panel
+- Focusing a detected session's terminal app
+- Terminating a detected shell/agent process from the UI
+
+Desktop mode currently does **not** try to be a full terminal emulator or universal terminal automation layer. The first pass is a lightweight session manager.
+
+## External Terminal Tracking
+
+Pixel Agents now uses a provider-based agent registry. The existing VS Code Claude integration is still there, and both the extension and the standalone app can watch for external macOS processes and create characters for them.
+
+- **Claude Code in VS Code terminals** — full terminal integration plus transcript watching
+- **Claude Code in external macOS terminals** — process detection first, transcript correlation when the session transcript can be found
+- **Codex in external macOS terminals** — process detection with a coarse running/idle model
+
+### Settings
+
+Use the standard VS Code settings UI or `settings.json`:
+
+```json
+{
+  "pixelAgents.externalTracking.enabled": true,
+  "pixelAgents.externalTracking.scanIntervalMs": 3000,
+  "pixelAgents.externalTracking.enableClaude": true,
+  "pixelAgents.externalTracking.enableCodex": true,
+  "pixelAgents.externalTracking.enableTranscriptCorrelation": true,
+  "pixelAgents.logging.debug": false
+}
+```
+
+### Privacy Notes
+
+- External tracking inspects the current user's process list on macOS to find likely Claude Code and Codex sessions.
+- When transcript correlation is enabled, Pixel Agents may inspect Claude transcript file paths under `~/.claude/projects` to improve activity detection.
+- Nothing is sent to a remote service by the extension or desktop app; this is still local observation only.
 
 ## Layout Editor
 
@@ -81,20 +157,30 @@ The extension will still work without the tileset — you'll get the default cha
 
 ## How It Works
 
-Pixel Agents watches Claude Code's JSONL transcript files to track what each agent is doing. When an agent uses a tool (like writing a file or running a command), the extension detects it and updates the character's animation accordingly. No modifications to Claude Code are needed — it's purely observational.
+Pixel Agents now has a provider-based backend:
+
+- A **VS Code Claude provider** tracks integrated terminals, launches new Claude sessions, restores them on reload, and follows `/clear` transcript reassignments.
+- An **agent registry** is the single source of truth for active visualized agents. It deduplicates overlapping observations, assigns stable visual IDs, and feeds the webview.
+- **External Claude** and **external Codex** providers scan macOS processes and register external sessions even when they were not launched from VS Code.
+- A reusable **Claude transcript watcher** parses JSONL transcripts for both VS Code and external Claude sessions when transcript files are available.
+
+When a Claude session uses a tool (like writing a file or running a command), the transcript watcher updates the character's animation. Codex currently uses a simpler process-backed state model.
 
 The webview runs a lightweight game loop with canvas rendering, BFS pathfinding, and a character state machine (idle → walk → type/read). Everything is pixel-perfect at integer zoom levels.
 
 ## Tech Stack
 
 - **Extension**: TypeScript, VS Code Webview API, esbuild
+- **Desktop app**: Electron, TypeScript
 - **Webview**: React 19, TypeScript, Vite, Canvas 2D
 
 ## Known Limitations
 
-- **Agent-terminal sync** — the way agents are connected to Claude Code terminal instances is not super robust and sometimes desyncs, especially when terminals are rapidly opened/closed or restored across sessions.
-- **Heuristic-based status detection** — Claude Code's JSONL transcript format does not provide clear signals for when an agent is waiting for user input or when it has finished its turn. The current detection is based on heuristics (idle timers, turn-duration events) and often misfires — agents may briefly show the wrong status or miss transitions.
-- **Windows-only testing** — the extension has only been tested on Windows 11. It may work on macOS or Linux, but there could be unexpected issues with file watching, paths, or terminal behavior on those platforms.
+- **Agent-terminal sync is still heuristic in places** — VS Code `/clear` reassignment and transcript discovery still rely on filesystem observation rather than a native Claude API.
+- **External Codex observability is coarse** — the first pass only detects active process presence and a simple running/idle state. It does not yet parse Codex-specific logs or transcripts.
+- **External Claude transcript correlation is best-effort** — richer external Claude state depends on being able to match a running process to a transcript file. Process counting works even when that correlation fails.
+- **macOS-first external support** — external process tracking is currently implemented for macOS. VS Code terminal support remains cross-platform in principle, but the new non-VS-Code process detection path is not implemented for Linux or Windows yet.
+- **Desktop terminal control is intentionally narrow** — the menubar app can launch, focus, and terminate detected shell/agent sessions, but it does not yet support generic keystroke injection, tab titles, or deep per-terminal-app controls.
 
 ## Roadmap
 

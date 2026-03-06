@@ -14,6 +14,7 @@ import { useEditorKeyboard } from './hooks/useEditorKeyboard.js'
 import { ZoomControls } from './components/ZoomControls.js'
 import { BottomToolbar } from './components/BottomToolbar.js'
 import { DebugView } from './components/DebugView.js'
+import { TerminalSessionsModal } from './components/TerminalSessionsModal.js'
 
 // Game state lives outside React — updated imperatively by message handlers
 const officeStateRef = { current: null as OfficeState | null }
@@ -121,9 +122,10 @@ function App() {
 
   const isEditDirty = useCallback(() => editor.isEditMode && editor.isDirty, [editor.isEditMode, editor.isDirty])
 
-  const { agents, selectedAgent, agentTools, agentStatuses, subagentTools, subagentCharacters, layoutReady, loadedAssets, workspaceFolders } = useExtensionMessages(getOfficeState, editor.setLastSavedLayout, isEditDirty)
+  const { agents, agentCapabilities, selectedAgent, agentTools, agentStatuses, hostContext, subagentTools, subagentCharacters, layoutReady, loadedAssets, terminalSessions, workspaceFolders } = useExtensionMessages(getOfficeState, editor.setLastSavedLayout, isEditDirty)
 
   const [isDebugMode, setIsDebugMode] = useState(false)
+  const [isTerminalPanelOpen, setIsTerminalPanelOpen] = useState(false)
 
   const handleToggleDebugMode = useCallback(() => setIsDebugMode((prev) => !prev), [])
 
@@ -155,10 +157,28 @@ function App() {
     const os = getOfficeState()
     const meta = os.subagentMeta.get(agentId)
     const focusId = meta ? meta.parentAgentId : agentId
-    vscode.postMessage({ type: 'focusAgent', id: focusId })
-  }, [])
+    if (agentCapabilities[focusId]?.focusable) {
+      vscode.postMessage({ type: 'focusAgent', id: focusId })
+    }
+  }, [agentCapabilities])
 
   const officeState = getOfficeState()
+
+  const handleOpenCodex = useCallback(() => {
+    vscode.postMessage({ type: 'openCodex' })
+  }, [])
+
+  const handleFocusTerminalSession = useCallback((sessionId: string) => {
+    vscode.postMessage({ type: 'focusTerminalSession', sessionId })
+  }, [])
+
+  const handleOpenTerminal = useCallback(() => {
+    vscode.postMessage({ type: 'openTerminal' })
+  }, [])
+
+  const handleTerminateTerminalSession = useCallback((sessionId: string) => {
+    vscode.postMessage({ type: 'terminateTerminalSession', sessionId })
+  }, [])
 
   // Force dependency on editorTickForKeyboard to propagate keyboard-triggered re-renders
   void editorTickForKeyboard
@@ -224,12 +244,26 @@ function App() {
       />
 
       <BottomToolbar
+        hostContext={hostContext}
         isEditMode={editor.isEditMode}
+        isTerminalPanelOpen={isTerminalPanelOpen}
         onOpenClaude={editor.handleOpenClaude}
+        onOpenCodex={handleOpenCodex}
+        onOpenTerminalPanel={() => setIsTerminalPanelOpen((prev) => !prev)}
         onToggleEditMode={editor.handleToggleEditMode}
         isDebugMode={isDebugMode}
         onToggleDebugMode={handleToggleDebugMode}
+        terminalSessionCount={terminalSessions.length}
         workspaceFolders={workspaceFolders}
+      />
+
+      <TerminalSessionsModal
+        isOpen={hostContext.mode === 'desktop' && isTerminalPanelOpen}
+        onClose={() => setIsTerminalPanelOpen(false)}
+        onFocusSession={handleFocusTerminalSession}
+        onOpenTerminal={handleOpenTerminal}
+        onTerminateSession={handleTerminateTerminalSession}
+        sessions={terminalSessions}
       />
 
       {editor.isEditMode && editor.isDirty && (
@@ -288,6 +322,8 @@ function App() {
       <ToolOverlay
         officeState={officeState}
         agents={agents}
+        agentCapabilities={agentCapabilities}
+        agentStatuses={agentStatuses}
         agentTools={agentTools}
         subagentCharacters={subagentCharacters}
         containerRef={containerRef}

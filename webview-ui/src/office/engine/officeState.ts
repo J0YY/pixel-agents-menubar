@@ -600,6 +600,14 @@ export class OfficeState {
     }
   }
 
+  clearWaitingBubble(id: number): void {
+    const ch = this.characters.get(id)
+    if (ch && ch.bubbleType === 'waiting') {
+      ch.bubbleType = null
+      ch.bubbleTimer = 0
+    }
+  }
+
   /** Dismiss bubble on click — permission: instant, waiting: quick fade */
   dismissBubble(id: number): void {
     const ch = this.characters.get(id)

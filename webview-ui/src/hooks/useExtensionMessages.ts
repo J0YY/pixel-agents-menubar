@@ -9,6 +9,7 @@ import { setWallSprites } from '../office/wallTiles.js'
 import { setCharacterTemplates } from '../office/sprites/spriteData.js'
 import { vscode } from '../vscodeApi.js'
 import { playDoneSound, setSoundEnabled } from '../notificationSound.js'
+import type { TerminalSession } from '../components/TerminalSessionsModal.js'
 
 export interface SubagentCharacter {
   id: number
@@ -40,15 +41,30 @@ export interface WorkspaceFolder {
   path: string
 }
 
+export interface AgentCapabilities {
+  closable?: boolean
+  focusable?: boolean
+}
+
+export interface HostContext {
+  canLaunchClaude?: boolean
+  canLaunchCodex?: boolean
+  canManageTerminals?: boolean
+  mode: 'desktop' | 'vscode'
+}
+
 export interface ExtensionMessageState {
   agents: number[]
+  agentCapabilities: Record<number, AgentCapabilities>
   selectedAgent: number | null
   agentTools: Record<number, ToolActivity[]>
   agentStatuses: Record<number, string>
+  hostContext: HostContext
   subagentTools: Record<number, Record<string, ToolActivity[]>>
   subagentCharacters: SubagentCharacter[]
   layoutReady: boolean
   loadedAssets?: { catalog: FurnitureAsset[]; sprites: Record<string, string[][]> }
+  terminalSessions: TerminalSession[]
   workspaceFolders: WorkspaceFolder[]
 }
 
@@ -67,13 +83,16 @@ export function useExtensionMessages(
   isEditDirty?: () => boolean,
 ): ExtensionMessageState {
   const [agents, setAgents] = useState<number[]>([])
+  const [agentCapabilities, setAgentCapabilities] = useState<Record<number, AgentCapabilities>>({})
   const [selectedAgent, setSelectedAgent] = useState<number | null>(null)
   const [agentTools, setAgentTools] = useState<Record<number, ToolActivity[]>>({})
   const [agentStatuses, setAgentStatuses] = useState<Record<number, string>>({})
+  const [hostContext, setHostContext] = useState<HostContext>({ mode: 'vscode' })
   const [subagentTools, setSubagentTools] = useState<Record<number, Record<string, ToolActivity[]>>>({})
   const [subagentCharacters, setSubagentCharacters] = useState<SubagentCharacter[]>([])
   const [layoutReady, setLayoutReady] = useState(false)
   const [loadedAssets, setLoadedAssets] = useState<{ catalog: FurnitureAsset[]; sprites: Record<string, string[][]> } | undefined>()
+  const [terminalSessions, setTerminalSessions] = useState<TerminalSession[]>([])
   const [workspaceFolders, setWorkspaceFolders] = useState<WorkspaceFolder[]>([])
 
   // Track whether initial layout has been loaded (ref to avoid re-render)
@@ -115,7 +134,9 @@ export function useExtensionMessages(
       } else if (msg.type === 'agentCreated') {
         const id = msg.id as number
         const folderName = msg.folderName as string | undefined
+        const capabilities = (msg.capabilities || {}) as AgentCapabilities
         setAgents((prev) => (prev.includes(id) ? prev : [...prev, id]))
+        setAgentCapabilities((prev) => ({ ...prev, [id]: capabilities }))
         setSelectedAgent(id)
         os.addAgent(id, undefined, undefined, undefined, undefined, folderName)
         saveAgentSeats(os)
@@ -135,6 +156,12 @@ export function useExtensionMessages(
           delete next[id]
           return next
         })
+        setAgentCapabilities((prev) => {
+          if (!(id in prev)) return prev
+          const next = { ...prev }
+          delete next[id]
+          return next
+        })
         setSubagentTools((prev) => {
           if (!(id in prev)) return prev
           const next = { ...prev }
@@ -149,11 +176,13 @@ export function useExtensionMessages(
         const incoming = msg.agents as number[]
         const meta = (msg.agentMeta || {}) as Record<number, { palette?: number; hueShift?: number; seatId?: string }>
         const folderNames = (msg.folderNames || {}) as Record<number, string>
+        const capabilities = (msg.agentCapabilities || {}) as Record<number, AgentCapabilities>
         // Buffer agents — they'll be added in layoutLoaded after seats are built
         for (const id of incoming) {
           const m = meta[id]
           pendingAgents.push({ id, palette: m?.palette, hueShift: m?.hueShift, seatId: m?.seatId, folderName: folderNames[id] })
         }
+        setAgentCapabilities((prev) => ({ ...prev, ...capabilities }))
         setAgents((prev) => {
           const ids = new Set(prev)
           const merged = [...prev]
@@ -221,20 +250,14 @@ export function useExtensionMessages(
         setSelectedAgent(id)
       } else if (msg.type === 'agentStatus') {
         const id = msg.id as number
-        const status = msg.status as string
-        setAgentStatuses((prev) => {
-          if (status === 'active') {
-            if (!(id in prev)) return prev
-            const next = { ...prev }
-            delete next[id]
-            return next
-          }
-          return { ...prev, [id]: status }
-        })
-        os.setAgentActive(id, status === 'active')
-        if (status === 'waiting') {
+        const status = normalizeAgentStatus(msg.status as string)
+        setAgentStatuses((prev) => ({ ...prev, [id]: status }))
+        os.setAgentActive(id, isWorkingStatus(status))
+        if (status === 'waiting_input' || status === 'done') {
           os.showWaitingBubble(id)
           playDoneSound()
+        } else {
+          os.clearWaitingBubble(id)
         }
       } else if (msg.type === 'agentToolPermission') {
         const id = msg.id as number
@@ -342,6 +365,10 @@ export function useExtensionMessages(
       } else if (msg.type === 'settingsLoaded') {
         const soundOn = msg.soundEnabled as boolean
         setSoundEnabled(soundOn)
+      } else if (msg.type === 'hostContext') {
+        setHostContext(msg as HostContext)
+      } else if (msg.type === 'terminalSessionsUpdated') {
+        setTerminalSessions((msg.sessions || []) as TerminalSession[])
       } else if (msg.type === 'furnitureAssetsLoaded') {
         try {
           const catalog = msg.catalog as FurnitureAsset[]
@@ -360,5 +387,15 @@ export function useExtensionMessages(
     return () => window.removeEventListener('message', handler)
   }, [getOfficeState])
 
-  return { agents, selectedAgent, agentTools, agentStatuses, subagentTools, subagentCharacters, layoutReady, loadedAssets, workspaceFolders }
+  return { agents, agentCapabilities, selectedAgent, agentTools, agentStatuses, hostContext, subagentTools, subagentCharacters, layoutReady, loadedAssets, terminalSessions, workspaceFolders }
+}
+
+function normalizeAgentStatus(status: string): string {
+  if (status === 'active') return 'running'
+  if (status === 'waiting') return 'waiting_input'
+  return status
+}
+
+function isWorkingStatus(status: string): boolean {
+  return status !== 'done' && status !== 'waiting_input'
 }
