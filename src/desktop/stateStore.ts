@@ -4,11 +4,13 @@ import * as path from 'path';
 interface DesktopState {
 	agentSeats: Record<string, { hueShift?: number; palette?: number; seatId?: string }>;
 	soundEnabled: boolean;
+	terminalLabels: Record<string, string>;
 }
 
 const DEFAULT_STATE: DesktopState = {
 	agentSeats: {},
 	soundEnabled: true,
+	terminalLabels: {},
 };
 
 export class DesktopStateStore {
@@ -34,6 +36,24 @@ export class DesktopStateStore {
 		return this.state.soundEnabled;
 	}
 
+	getTerminalLabelOverrides(): Record<string, string> {
+		return this.state.terminalLabels;
+	}
+
+	setTerminalLabelOverride(sessionId: string, label: string | undefined): void {
+		const terminalLabels = { ...this.state.terminalLabels };
+		if (label) {
+			terminalLabels[sessionId] = label;
+		} else {
+			delete terminalLabels[sessionId];
+		}
+		this.state = {
+			...this.state,
+			terminalLabels,
+		};
+		this.writeState();
+	}
+
 	setSoundEnabled(soundEnabled: boolean): void {
 		this.state = {
 			...this.state,
@@ -52,6 +72,7 @@ export class DesktopStateStore {
 			return {
 				agentSeats: parsed.agentSeats ?? {},
 				soundEnabled: parsed.soundEnabled ?? true,
+				terminalLabels: parsed.terminalLabels ?? {},
 			};
 		} catch {
 			return DEFAULT_STATE;
@@ -67,4 +88,3 @@ export class DesktopStateStore {
 		}
 	}
 }
-

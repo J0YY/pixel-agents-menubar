@@ -1,10 +1,13 @@
+import * as path from 'path';
 import type { PixelAgentsLogger } from '../agents/logger.js';
 import { ProcessScanner } from '../agents/processScanner.js';
 import { TerminalController } from '../agents/terminalController.js';
 import { listTerminalSessions } from '../agents/terminalProcessUtils.js';
+import { DesktopStateStore } from './stateStore.js';
 
 interface TerminalSessionDto {
 	commandLine: string;
+	cwd?: string;
 	detail: string;
 	id: string;
 	kind: 'agent' | 'shell';
@@ -16,11 +19,13 @@ interface TerminalSessionDto {
 
 export class TerminalSessionService {
 	private lastPayloadSignature = '';
+	private latestSessionSnapshots: ReturnType<typeof listTerminalSessions> = [];
 	private latestSessions: TerminalSessionDto[] = [];
 	private messageTarget: { postMessage: (message: unknown) => void } | undefined;
 	private scanTimer: ReturnType<typeof setInterval> | null = null;
 
 	constructor(
+		private readonly stateStore: DesktopStateStore,
 		private readonly scanner: ProcessScanner,
 		private readonly terminalController: TerminalController,
 		private readonly logger: PixelAgentsLogger,
@@ -43,6 +48,7 @@ export class TerminalSessionService {
 			clearInterval(this.scanTimer);
 			this.scanTimer = null;
 		}
+		this.latestSessionSnapshots = [];
 		this.latestSessions = [];
 		this.lastPayloadSignature = '';
 		this.messageTarget = undefined;
@@ -73,18 +79,15 @@ export class TerminalSessionService {
 		await this.terminalController.launchShell(folderPath);
 	}
 
+	renameSession(sessionId: string, label: string | undefined): void {
+		this.stateStore.setTerminalLabelOverride(sessionId, normalizeTerminalLabel(label));
+		this.rebuildSessionDtos();
+	}
+
 	private async scanNow(): Promise<void> {
 		const processes = await this.scanner.scan();
-		const sessions = listTerminalSessions(processes).map((session) => ({
-			commandLine: session.commandLine,
-			detail: buildSessionDetail(session.commandLine),
-			id: session.id,
-			kind: session.kind,
-			label: buildSessionLabel(session.kind, session.executable),
-			pid: session.pid,
-			runningFor: formatElapsedSeconds(session.elapsedSeconds),
-			terminalApp: session.terminalApp,
-		}));
+		this.latestSessionSnapshots = listTerminalSessions(processes);
+		const sessions = this.buildSessionDtos(this.latestSessionSnapshots);
 
 		const payloadSignature = JSON.stringify(sessions);
 		if (payloadSignature === this.lastPayloadSignature) {
@@ -108,6 +111,27 @@ export class TerminalSessionService {
 			sessions: this.latestSessions,
 		});
 	}
+
+	private rebuildSessionDtos(): void {
+		this.latestSessions = this.buildSessionDtos(this.latestSessionSnapshots);
+		this.lastPayloadSignature = JSON.stringify(this.latestSessions);
+		this.sendSessions();
+	}
+
+	private buildSessionDtos(snapshots: ReturnType<typeof listTerminalSessions>): TerminalSessionDto[] {
+		const labelOverrides = this.stateStore.getTerminalLabelOverrides();
+		return snapshots.map((session) => ({
+			commandLine: session.commandLine,
+			cwd: session.cwd,
+			detail: buildSessionDetail(session.commandLine),
+			id: session.id,
+			kind: session.kind,
+			label: labelOverrides[session.id] ?? buildSessionLabel(session.kind, session.executable, session.cwd),
+			pid: session.pid,
+			runningFor: formatElapsedSeconds(session.elapsedSeconds),
+			terminalApp: session.terminalApp,
+		}));
+	}
 }
 
 function buildSessionDetail(commandLine: string): string {
@@ -118,12 +142,22 @@ function buildSessionDetail(commandLine: string): string {
 	return `${compact.slice(0, 85)}...`;
 }
 
-function buildSessionLabel(kind: 'agent' | 'shell', executable: string): string {
+function buildSessionLabel(kind: 'agent' | 'shell', executable: string, cwd?: string): string {
+	if (cwd) {
+		const folderName = path.basename(cwd);
+		if (folderName && folderName !== path.sep) {
+			return folderName;
+		}
+	}
+
 	const display = executable
 		.split(/[-_]/)
 		.filter(Boolean)
 		.map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
 		.join(' ');
+	if (!display) {
+		return kind === 'agent' ? 'Agent session' : 'Shell session';
+	}
 	return kind === 'agent' ? display : `${display} shell`;
 }
 
@@ -149,4 +183,9 @@ function parseSessionPid(sessionId: string): number | undefined {
 	}
 	const pid = Number.parseInt(match[1], 10);
 	return Number.isFinite(pid) ? pid : undefined;
+}
+
+function normalizeTerminalLabel(label: string | undefined): string | undefined {
+	const trimmed = label?.trim();
+	return trimmed ? trimmed : undefined;
 }

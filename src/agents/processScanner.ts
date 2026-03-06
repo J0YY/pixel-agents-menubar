@@ -25,6 +25,7 @@ export class ProcessScanner {
 		try {
 			const { stdout } = await execFileAsync('ps', ['-axo', 'pid=,ppid=,etime=,comm=,command=']);
 			const processes = parsePsOutput(stdout);
+			await attachWorkingDirectories(processes, this.logger);
 			this.cachedProcesses = processes;
 			this.cachedAt = now;
 			return processes;
@@ -64,6 +65,68 @@ function parsePsOutput(stdout: string): ProcessSnapshot[] {
 	}
 
 	return processes;
+}
+
+async function attachWorkingDirectories(
+	processes: ProcessSnapshot[],
+	logger: PixelAgentsLogger,
+): Promise<void> {
+	const candidatePids = processes
+		.filter((processSnapshot) => shouldResolveCwd(processSnapshot))
+		.map((processSnapshot) => processSnapshot.pid);
+
+	if (candidatePids.length === 0) {
+		return;
+	}
+
+	try {
+		const cwdByPid = await resolveCwdByPid(candidatePids);
+		for (const processSnapshot of processes) {
+			processSnapshot.cwd = cwdByPid.get(processSnapshot.pid);
+		}
+	} catch (error) {
+		logger.warn('Working directory scan failed', error);
+	}
+}
+
+async function resolveCwdByPid(pids: number[]): Promise<Map<number, string>> {
+	let stdout = '';
+	try {
+		({ stdout } = await execFileAsync('lsof', ['-a', '-d', 'cwd', '-Fn', ...pids.flatMap((pid) => ['-p', String(pid)])]));
+	} catch (error) {
+		const partialStdout = (error as { stdout?: string }).stdout;
+		if (typeof partialStdout !== 'string' || partialStdout.length === 0) {
+			throw error;
+		}
+		stdout = partialStdout;
+	}
+	const cwdByPid = new Map<number, string>();
+	let currentPid: number | null = null;
+
+	for (const line of stdout.split('\n')) {
+		if (!line) {
+			continue;
+		}
+
+		const prefix = line[0];
+		const value = line.slice(1);
+		if (prefix === 'p') {
+			const pid = Number.parseInt(value, 10);
+			currentPid = Number.isFinite(pid) ? pid : null;
+			continue;
+		}
+
+		if (prefix === 'n' && currentPid !== null) {
+			cwdByPid.set(currentPid, value);
+		}
+	}
+
+	return cwdByPid;
+}
+
+function shouldResolveCwd(processSnapshot: ProcessSnapshot): boolean {
+	const haystack = `${processSnapshot.executable} ${processSnapshot.commandLine}`.toLowerCase();
+	return /(^|\s|\/)(bash|dash|fish|nu|screen|sh|tcsh|tmux|xonsh|zsh|claude|claude-code|codex)(\s|$)/.test(haystack);
 }
 
 function parseElapsedTime(rawValue: string): number | null {

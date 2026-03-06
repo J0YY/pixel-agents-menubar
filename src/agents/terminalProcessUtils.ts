@@ -33,6 +33,7 @@ export type TerminalSessionKind = 'agent' | 'shell';
 
 export interface TerminalSessionSnapshot {
 	commandLine: string;
+	cwd?: string;
 	elapsedSeconds: number;
 	executable: string;
 	id: string;
@@ -96,6 +97,7 @@ export function listTerminalSessions(processes: ProcessSnapshot[]): TerminalSess
 
 		candidates.set(processSnapshot.pid, {
 			commandLine: processSnapshot.commandLine,
+			cwd: processSnapshot.cwd,
 			elapsedSeconds: processSnapshot.elapsedSeconds,
 			executable: getDisplayProcessName(processSnapshot),
 			id: `pid:${processSnapshot.pid}`,

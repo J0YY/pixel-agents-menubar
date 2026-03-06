@@ -180,6 +180,10 @@ function App() {
     vscode.postMessage({ type: 'terminateTerminalSession', sessionId })
   }, [])
 
+  const handleRenameTerminalSession = useCallback((sessionId: string, sessionLabel: string) => {
+    vscode.postMessage({ type: 'renameTerminalSession', sessionId, sessionLabel })
+  }, [])
+
   // Force dependency on editorTickForKeyboard to propagate keyboard-triggered re-renders
   void editorTickForKeyboard
 
@@ -262,6 +266,7 @@ function App() {
         onClose={() => setIsTerminalPanelOpen(false)}
         onFocusSession={handleFocusTerminalSession}
         onOpenTerminal={handleOpenTerminal}
+        onRenameSession={handleRenameTerminalSession}
         onTerminateSession={handleTerminateTerminalSession}
         sessions={terminalSessions}
       />

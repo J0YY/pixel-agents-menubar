@@ -87,9 +87,9 @@ export interface AgentPresentation {
 
 export interface ProcessSnapshot {
 	commandLine: string;
+	cwd?: string;
 	elapsedSeconds: number;
 	executable: string;
 	pid: number;
 	ppid: number;
 }
-

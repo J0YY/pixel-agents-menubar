@@ -46,6 +46,7 @@ class PixelAgentsDesktopApp {
 		this.stateStore = new DesktopStateStore(statePath);
 		this.agentService = new DesktopAgentService(this.stateStore, this.logger, this.processScanner, this.terminalController);
 		this.terminalSessionService = new TerminalSessionService(
+			this.stateStore,
 			this.processScanner,
 			this.terminalController,
 			this.logger,
@@ -148,6 +149,7 @@ class PixelAgentsDesktopApp {
 				layout?: Record<string, unknown>;
 				seats?: Record<string, { hueShift?: number; palette?: number; seatId?: string }>;
 				sessionId?: string;
+				sessionLabel?: string;
 				type?: string;
 			};
 			switch (payload.type) {
@@ -205,6 +207,11 @@ class PixelAgentsDesktopApp {
 				case 'terminateTerminalSession':
 					if (typeof payload.sessionId === 'string') {
 						this.terminalSessionService.terminateSession(payload.sessionId);
+					}
+					break;
+				case 'renameTerminalSession':
+					if (typeof payload.sessionId === 'string') {
+						this.terminalSessionService.renameSession(payload.sessionId, payload.sessionLabel);
 					}
 					break;
 				case 'webviewReady':

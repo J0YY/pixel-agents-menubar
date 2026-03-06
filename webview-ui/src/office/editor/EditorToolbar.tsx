@@ -5,6 +5,7 @@ import { getCatalogByCategory, buildDynamicCatalog, getActiveCategories } from '
 import type { FurnitureCategory, LoadedAssetData } from '../layout/furnitureCatalog.js'
 import { getCachedSprite } from '../sprites/spriteCache.js'
 import { getColorizedFloorSprite, getFloorPatternCount, hasFloorSprites } from '../floorTiles.js'
+import { wallColorToHex } from '../wallTiles.js'
 
 const btnStyle: React.CSSProperties = {
   padding: '3px 8px',
@@ -139,6 +140,68 @@ function ColorSlider({ label, value, min, max, onChange }: {
 
 const DEFAULT_FURNITURE_COLOR: FloorColor = { h: 0, s: 0, b: 0, c: 0 }
 
+interface MaterialPreset {
+  label: string
+  patternIndex?: number
+  color: FloorColor
+}
+
+const FLOOR_MATERIAL_PRESETS: MaterialPreset[] = [
+  { label: 'Oak', patternIndex: 1, color: { h: 34, s: 42, b: 8, c: 10 } },
+  { label: 'Walnut', patternIndex: 2, color: { h: 24, s: 46, b: -18, c: 16 } },
+  { label: 'Stone', patternIndex: 3, color: { h: 205, s: 8, b: -24, c: 18 } },
+  { label: 'Concrete', patternIndex: 4, color: { h: 198, s: 6, b: -8, c: -8 } },
+  { label: 'Terracotta', patternIndex: 5, color: { h: 18, s: 55, b: 6, c: 4 } },
+  { label: 'Forest', patternIndex: 6, color: { h: 118, s: 24, b: -20, c: 6 } },
+  { label: 'Navy', patternIndex: 7, color: { h: 218, s: 42, b: -18, c: 10 } },
+  { label: 'Mint', patternIndex: 2, color: { h: 164, s: 22, b: 8, c: 0 } },
+]
+
+const WALL_MATERIAL_PRESETS: MaterialPreset[] = [
+  { label: 'Ivory', color: { h: 42, s: 18, b: 18, c: -4 } },
+  { label: 'Sage', color: { h: 108, s: 18, b: 6, c: -2 } },
+  { label: 'Slate', color: { h: 214, s: 16, b: -20, c: 10 } },
+  { label: 'Brick', color: { h: 12, s: 48, b: -4, c: 8 } },
+  { label: 'Midnight', color: { h: 228, s: 34, b: -28, c: 14 } },
+  { label: 'Teal', color: { h: 182, s: 26, b: -8, c: 4 } },
+]
+
+function MaterialPresetButton({ active, label, onClick, swatch }: {
+  active: boolean
+  label: string
+  onClick: () => void
+  swatch: string
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 6,
+        padding: '4px 8px',
+        border: active ? '2px solid #5a8cff' : '2px solid #4a4a6a',
+        background: active ? 'rgba(90, 140, 255, 0.18)' : '#202032',
+        color: 'rgba(255, 255, 255, 0.85)',
+        cursor: 'pointer',
+        fontSize: '18px',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      <span
+        style={{
+          width: 14,
+          height: 14,
+          background: swatch,
+          border: '1px solid rgba(255,255,255,0.2)',
+          flexShrink: 0,
+        }}
+      />
+      {label}
+    </button>
+  )
+}
+
 export function EditorToolbar({
   activeTool,
   selectedTileType,
@@ -202,6 +265,8 @@ export function EditorToolbar({
   const patternCount = getFloorPatternCount()
   // Wall is TileType 0, floor patterns are 1..patternCount
   const floorPatterns = Array.from({ length: patternCount }, (_, i) => i + 1)
+  const activeFloorPresetKey = `${selectedTileType}:${floorColor.h}:${floorColor.s}:${floorColor.b}:${floorColor.c}`
+  const activeWallPresetKey = `${wallColor.h}:${wallColor.s}:${wallColor.b}:${wallColor.c}`
 
   const thumbSize = 36 // 2x for items
 
@@ -299,6 +364,26 @@ export function EditorToolbar({
             </div>
           )}
 
+          <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 2 }}>
+            {FLOOR_MATERIAL_PRESETS.map((preset) => {
+              const presetKey = `${preset.patternIndex}:${preset.color.h}:${preset.color.s}:${preset.color.b}:${preset.color.c}`
+              return (
+                <MaterialPresetButton
+                  key={preset.label}
+                  active={activeFloorPresetKey === presetKey}
+                  label={preset.label}
+                  onClick={() => {
+                    onFloorColorChange({ ...preset.color })
+                    if (preset.patternIndex) {
+                      onTileTypeChange(preset.patternIndex as TileTypeVal)
+                    }
+                  }}
+                  swatch={wallColorToHex(preset.color)}
+                />
+              )
+            })}
+          </div>
+
           {/* Floor pattern horizontal carousel — at the top */}
           <div style={{ display: 'flex', gap: 4, overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 2 }}>
             {floorPatterns.map((patIdx) => (
@@ -345,6 +430,21 @@ export function EditorToolbar({
               <ColorSlider label="C" value={wallColor.c} min={-100} max={100} onChange={(v) => handleWallColorChange('c', v)} />
             </div>
           )}
+
+          <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 2 }}>
+            {WALL_MATERIAL_PRESETS.map((preset) => {
+              const presetKey = `${preset.color.h}:${preset.color.s}:${preset.color.b}:${preset.color.c}`
+              return (
+                <MaterialPresetButton
+                  key={preset.label}
+                  active={activeWallPresetKey === presetKey}
+                  label={preset.label}
+                  onClick={() => onWallColorChange({ ...preset.color })}
+                  swatch={wallColorToHex(preset.color)}
+                />
+              )
+            })}
+          </div>
 
         </div>
       )}

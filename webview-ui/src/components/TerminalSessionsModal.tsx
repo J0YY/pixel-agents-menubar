@@ -2,6 +2,7 @@ import { useState } from 'react'
 
 export interface TerminalSession {
   commandLine: string
+  cwd?: string
   detail: string
   id: string
   kind: 'agent' | 'shell'
@@ -16,6 +17,7 @@ interface TerminalSessionsModalProps {
   onClose: () => void
   onFocusSession: (sessionId: string) => void
   onOpenTerminal: () => void
+  onRenameSession: (sessionId: string, label: string) => void
   onTerminateSession: (sessionId: string) => void
   sessions: TerminalSession[]
 }
@@ -34,10 +36,13 @@ export function TerminalSessionsModal({
   onClose,
   onFocusSession,
   onOpenTerminal,
+  onRenameSession,
   onTerminateSession,
   sessions,
 }: TerminalSessionsModalProps) {
   const [hovered, setHovered] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [draftLabel, setDraftLabel] = useState('')
 
   if (!isOpen) return null
 
@@ -120,6 +125,7 @@ export function TerminalSessionsModal({
             sessions.map((session) => {
               const hoverKey = `session:${session.id}`
               const isHovered = hovered === hoverKey
+              const isEditing = editingId === session.id
               return (
                 <div
                   key={session.id}
@@ -145,7 +151,35 @@ export function TerminalSessionsModal({
                         flexWrap: 'wrap',
                       }}
                     >
-                      <span style={{ fontSize: '21px', color: 'var(--pixel-text)' }}>{session.label}</span>
+                      {isEditing ? (
+                        <input
+                          autoFocus
+                          value={draftLabel}
+                          onChange={(e) => setDraftLabel(e.target.value)}
+                          onBlur={() => {
+                            onRenameSession(session.id, draftLabel)
+                            setEditingId(null)
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              onRenameSession(session.id, draftLabel)
+                              setEditingId(null)
+                            } else if (e.key === 'Escape') {
+                              setEditingId(null)
+                            }
+                          }}
+                          style={{
+                            background: 'rgba(255,255,255,0.08)',
+                            border: '2px solid var(--pixel-border)',
+                            color: 'var(--pixel-text)',
+                            fontSize: '19px',
+                            minWidth: 140,
+                            padding: '2px 6px',
+                          }}
+                        />
+                      ) : (
+                        <span style={{ fontSize: '21px', color: 'var(--pixel-text)' }}>{session.label}</span>
+                      )}
                       <span
                         style={{
                           fontSize: '14px',
@@ -163,6 +197,18 @@ export function TerminalSessionsModal({
                         {session.runningFor}
                       </span>
                     </div>
+                    {session.cwd && (
+                      <div
+                        style={{
+                          fontSize: '14px',
+                          color: 'var(--pixel-text-dim)',
+                          marginBottom: 3,
+                          wordBreak: 'break-word',
+                        }}
+                      >
+                        {session.cwd}
+                      </div>
+                    )}
                     <div style={{ fontSize: '15px', color: 'var(--pixel-text-dim)', marginBottom: 3 }}>
                       PID {session.pid}
                     </div>
@@ -178,6 +224,15 @@ export function TerminalSessionsModal({
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'start' }}>
+                    <button
+                      onClick={() => {
+                        setEditingId(session.id)
+                        setDraftLabel(session.label)
+                      }}
+                      style={actionButtonStyle}
+                    >
+                      Rename
+                    </button>
                     <button
                       onClick={() => onFocusSession(session.id)}
                       style={actionButtonStyle}

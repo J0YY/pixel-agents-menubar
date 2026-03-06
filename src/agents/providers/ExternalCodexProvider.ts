@@ -1,3 +1,4 @@
+import * as path from 'path';
 import type { PixelAgentsLogger } from '../logger.js';
 import type { AgentProvider } from '../provider.js';
 import { AgentRegistry } from '../registry.js';
@@ -14,6 +15,7 @@ interface ExternalCodexProviderOptions {
 
 interface ExternalCodexSession {
 	commandLine: string;
+	cwd?: string;
 	firstSeenAt: number;
 	pid: number;
 	providerSessionId: string;
@@ -83,6 +85,7 @@ export class ExternalCodexProvider implements AgentProvider {
 			liveSessionIds.add(providerSessionId);
 			const session = this.getOrCreateSession(providerSessionId, terminalSession.pid);
 			session.commandLine = terminalSession.commandLine;
+			session.cwd = terminalSession.cwd;
 			observations.push(this.toObservation(session));
 		}
 
@@ -122,6 +125,8 @@ export class ExternalCodexProvider implements AgentProvider {
 			identityKeys: [`external-codex-pid:${session.pid}`],
 			metadata: {
 				commandLine: session.commandLine,
+				cwd: session.cwd,
+				folderName: session.cwd ? path.basename(session.cwd) : undefined,
 				pid: session.pid,
 			},
 			priority: 50,

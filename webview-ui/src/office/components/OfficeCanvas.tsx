@@ -42,6 +42,8 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
   const isEraseDraggingRef = useRef(false)
   // Zoom scroll accumulator for trackpad pinch sensitivity
   const zoomAccumulatorRef = useRef(0)
+  const agentDragRef = useRef<{ id: number; isDragging: boolean; startX: number; startY: number } | null>(null)
+  const suppressClickRef = useRef(false)
 
   // Clamp pan so the map edge can't go past a margin inside the viewport
   const clampPan = useCallback((px: number, py: number): { x: number; y: number } => {
@@ -370,8 +372,29 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
 
       const pos = screenToWorld(e.clientX, e.clientY)
       if (!pos) return
-      const hitId = officeState.getCharacterAt(pos.worldX, pos.worldY)
       const tile = screenToTile(e.clientX, e.clientY)
+
+      const activeAgentDrag = agentDragRef.current
+      if (activeAgentDrag) {
+        const movedEnough = Math.abs(e.clientX - activeAgentDrag.startX) >= 4 || Math.abs(e.clientY - activeAgentDrag.startY) >= 4
+        if (movedEnough) {
+          activeAgentDrag.isDragging = true
+          officeState.selectedAgentId = activeAgentDrag.id
+          officeState.cameraFollowId = null
+        }
+
+        if (activeAgentDrag.isDragging) {
+          officeState.hoveredTile = tile
+          officeState.hoveredAgentId = activeAgentDrag.id
+          const canvas = canvasRef.current
+          if (canvas) {
+            canvas.style.cursor = 'grabbing'
+          }
+          return
+        }
+      }
+
+      const hitId = officeState.getCharacterAt(pos.worldX, pos.worldY)
       officeState.hoveredTile = tile
       const canvas = canvasRef.current
       if (canvas) {
@@ -431,7 +454,24 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
         return
       }
 
-      if (!isEditMode) return
+      if (!isEditMode) {
+        if (e.button !== 0) return
+        const pos = screenToWorld(e.clientX, e.clientY)
+        if (!pos) return
+        const hitId = officeState.getCharacterAt(pos.worldX, pos.worldY)
+        if (hitId !== null) {
+          const ch = officeState.characters.get(hitId)
+          if (ch && !ch.isSubagent) {
+            agentDragRef.current = {
+              id: hitId,
+              isDragging: false,
+              startX: e.clientX,
+              startY: e.clientY,
+            }
+          }
+        }
+        return
+      }
 
       // Check rotate/delete button hit first
       const pos = screenToWorld(e.clientX, e.clientY)
@@ -499,6 +539,41 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
         return
       }
 
+      if (!isEditMode) {
+        const activeAgentDrag = agentDragRef.current
+        agentDragRef.current = null
+        if (activeAgentDrag?.isDragging) {
+          suppressClickRef.current = true
+          officeState.selectedAgentId = activeAgentDrag.id
+          officeState.cameraFollowId = null
+
+          const tile = screenToTile(e.clientX, e.clientY)
+          const selectedCh = officeState.characters.get(activeAgentDrag.id)
+          if (tile && selectedCh && !selectedCh.isSubagent) {
+            const seatId = officeState.getSeatAtTile(tile.col, tile.row)
+            if (seatId) {
+              const seat = officeState.seats.get(seatId)
+              if (seat) {
+                if (selectedCh.seatId === seatId) {
+                  officeState.sendToSeat(activeAgentDrag.id)
+                } else if (!seat.assigned) {
+                  officeState.reassignSeat(activeAgentDrag.id, seatId)
+                  persistAgentSeats(officeState)
+                }
+              }
+            } else {
+              officeState.walkToTile(activeAgentDrag.id, tile.col, tile.row)
+            }
+          }
+
+          const canvas = canvasRef.current
+          if (canvas) {
+            canvas.style.cursor = 'default'
+          }
+          return
+        }
+      }
+
       // Handle drag-to-move completion
       if (editorState.dragUid) {
         if (editorState.isDragMoving) {
@@ -543,6 +618,10 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
       if (isEditMode) return // handled by mouseDown/mouseUp
+      if (suppressClickRef.current) {
+        suppressClickRef.current = false
+        return
+      }
       const pos = screenToWorld(e.clientX, e.clientY)
       if (!pos) return
 
@@ -584,13 +663,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
                   officeState.reassignSeat(officeState.selectedAgentId, seatId)
                   officeState.selectedAgentId = null
                   officeState.cameraFollowId = null
-                  // Persist seat assignments (exclude sub-agents)
-                  const seats: Record<number, { palette: number; seatId: string | null }> = {}
-                  for (const ch of officeState.characters.values()) {
-                    if (ch.isSubagent) continue
-                    seats[ch.id] = { palette: ch.palette, seatId: ch.seatId }
-                  }
-                  vscode.postMessage({ type: 'saveAgentSeats', seats })
+                  persistAgentSeats(officeState)
                   return
                 }
               }
@@ -613,6 +686,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
     editorState.clearDrag()
     editorState.ghostCol = -1
     editorState.ghostRow = -1
+    agentDragRef.current = null
     officeState.hoveredAgentId = null
     officeState.hoveredTile = null
   }, [officeState, editorState])
@@ -687,4 +761,13 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
       />
     </div>
   )
+}
+
+function persistAgentSeats(officeState: OfficeState): void {
+  const seats: Record<number, { palette: number; hueShift: number; seatId: string | null }> = {}
+  for (const ch of officeState.characters.values()) {
+    if (ch.isSubagent) continue
+    seats[ch.id] = { palette: ch.palette, hueShift: ch.hueShift, seatId: ch.seatId }
+  }
+  vscode.postMessage({ type: 'saveAgentSeats', seats })
 }

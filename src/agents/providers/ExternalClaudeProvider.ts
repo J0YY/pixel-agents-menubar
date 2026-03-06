@@ -13,6 +13,7 @@ import type { AgentObservation } from '../types.js';
 
 interface ExternalClaudeSession {
 	commandLine: string;
+	cwd?: string;
 	elapsedSeconds: number;
 	firstSeenAt: number;
 	pid: number;
@@ -101,6 +102,7 @@ export class ExternalClaudeProvider implements AgentProvider {
 			liveSessionIds.add(providerSessionId);
 			const session = this.getOrCreateSession(providerSessionId, terminalSession.pid);
 			session.commandLine = terminalSession.commandLine;
+			session.cwd = terminalSession.cwd;
 			session.elapsedSeconds = terminalSession.elapsedSeconds;
 			session.sessionId = extractSessionId(terminalSession.commandLine) ?? session.sessionId;
 
@@ -224,6 +226,8 @@ export class ExternalClaudeProvider implements AgentProvider {
 			].filter(Boolean),
 			metadata: {
 				commandLine: session.commandLine,
+				cwd: session.cwd,
+				folderName: session.cwd ? path.basename(session.cwd) : undefined,
 				jsonlFile: session.transcriptPath,
 				pid: session.pid,
 				sessionId: session.sessionId,
