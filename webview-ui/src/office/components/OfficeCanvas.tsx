@@ -8,6 +8,7 @@ import { TILE_SIZE, EditTool } from '../types.js'
 import { CAMERA_FOLLOW_LERP, CAMERA_FOLLOW_SNAP_THRESHOLD, ZOOM_MIN, ZOOM_MAX, ZOOM_SCROLL_THRESHOLD, PAN_MARGIN_FRACTION } from '../../constants.js'
 import { getCatalogEntry, isRotatable } from '../layout/furnitureCatalog.js'
 import { canPlaceFurniture, getWallPlacementRow } from '../editor/editorActions.js'
+import { isWalkable } from '../layout/tileMap.js'
 import { vscode } from '../../vscodeApi.js'
 import { unlockAudio } from '../../notificationSound.js'
 
@@ -199,8 +200,10 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
         // Build selection render state
         const selectionRender: SelectionRenderState = {
           selectedAgentId: officeState.selectedAgentId,
+          draggingAgentId: officeState.draggingAgentId,
           hoveredAgentId: officeState.hoveredAgentId,
           hoveredTile: officeState.hoveredTile,
+          blockedTiles: officeState.blockedTiles,
           seats: officeState.seats,
           characters: officeState.characters,
         }
@@ -381,14 +384,16 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
           activeAgentDrag.isDragging = true
           officeState.selectedAgentId = activeAgentDrag.id
           officeState.cameraFollowId = null
+          officeState.draggingAgentId = activeAgentDrag.id
         }
 
         if (activeAgentDrag.isDragging) {
           officeState.hoveredTile = tile
           officeState.hoveredAgentId = activeAgentDrag.id
+          officeState.draggingAgentId = activeAgentDrag.id
           const canvas = canvasRef.current
           if (canvas) {
-            canvas.style.cursor = 'grabbing'
+            canvas.style.cursor = getAgentDropCursor(officeState, activeAgentDrag.id, tile)
           }
           return
         }
@@ -542,6 +547,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
       if (!isEditMode) {
         const activeAgentDrag = agentDragRef.current
         agentDragRef.current = null
+        officeState.draggingAgentId = null
         if (activeAgentDrag?.isDragging) {
           suppressClickRef.current = true
           officeState.selectedAgentId = activeAgentDrag.id
@@ -687,6 +693,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
     editorState.ghostCol = -1
     editorState.ghostRow = -1
     agentDragRef.current = null
+    officeState.draggingAgentId = null
     officeState.hoveredAgentId = null
     officeState.hoveredTile = null
   }, [officeState, editorState])
@@ -770,4 +777,32 @@ function persistAgentSeats(officeState: OfficeState): void {
     seats[ch.id] = { palette: ch.palette, hueShift: ch.hueShift, seatId: ch.seatId }
   }
   vscode.postMessage({ type: 'saveAgentSeats', seats })
+}
+
+function getAgentDropCursor(
+  officeState: OfficeState,
+  agentId: number,
+  tile: { col: number; row: number } | null,
+): string {
+  if (!tile) {
+    return 'not-allowed'
+  }
+
+  const selectedCh = officeState.characters.get(agentId)
+  if (!selectedCh || selectedCh.isSubagent) {
+    return 'not-allowed'
+  }
+
+  const seatId = officeState.getSeatAtTile(tile.col, tile.row)
+  if (seatId) {
+    const seat = officeState.seats.get(seatId)
+    if (!seat) {
+      return 'not-allowed'
+    }
+    return !seat.assigned || selectedCh.seatId === seatId ? 'grabbing' : 'not-allowed'
+  }
+
+  return isWalkable(tile.col, tile.row, officeState.tileMap, officeState.blockedTiles)
+    ? 'grabbing'
+    : 'not-allowed'
 }

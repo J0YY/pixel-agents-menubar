@@ -36,6 +36,7 @@ export class OfficeState {
   characters: Map<number, Character> = new Map()
   selectedAgentId: number | null = null
   cameraFollowId: number | null = null
+  draggingAgentId: number | null = null
   hoveredAgentId: number | null = null
   hoveredTile: { col: number; row: number } | null = null
   /** Maps "parentId:toolId" → sub-agent character ID (negative) */
@@ -258,6 +259,7 @@ export class OfficeState {
     }
     if (this.selectedAgentId === id) this.selectedAgentId = null
     if (this.cameraFollowId === id) this.cameraFollowId = null
+    if (this.draggingAgentId === id) this.draggingAgentId = null
     // Start despawn animation instead of immediate delete
     ch.matrixEffect = 'despawn'
     ch.matrixEffectTimer = 0
@@ -452,6 +454,7 @@ export class OfficeState {
     this.subagentMeta.delete(id)
     if (this.selectedAgentId === id) this.selectedAgentId = null
     if (this.cameraFollowId === id) this.cameraFollowId = null
+    if (this.draggingAgentId === id) this.draggingAgentId = null
   }
 
   /** Remove all sub-agents belonging to a parent agent */
@@ -481,6 +484,7 @@ export class OfficeState {
         this.subagentMeta.delete(id)
         if (this.selectedAgentId === id) this.selectedAgentId = null
         if (this.cameraFollowId === id) this.cameraFollowId = null
+        if (this.draggingAgentId === id) this.draggingAgentId = null
         toRemove.push(key)
       }
     }

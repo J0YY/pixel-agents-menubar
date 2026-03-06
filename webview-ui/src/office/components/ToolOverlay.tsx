@@ -110,6 +110,7 @@ export function ToolOverlay({
         const isSelected = selectedId === id
         const isHovered = hoveredId === id
         const isSub = ch.isSubagent
+        const isDragging = officeState.draggingAgentId === id
 
         // Only show for hovered or selected agents
         if (!isSelected && !isHovered) return null
@@ -215,8 +216,21 @@ export function ToolOverlay({
                       textOverflow: 'ellipsis',
                       display: 'block',
                     }}
+                    >
+                      {ch.folderName}
+                    </span>
+                )}
+                {isSelected && !isSub && (
+                  <span
+                    style={{
+                      fontSize: '14px',
+                      color: isDragging ? '#9cd0ff' : 'var(--pixel-text-dim)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      display: 'block',
+                    }}
                   >
-                    {ch.folderName}
+                    {isDragging ? 'Drop to move or re-seat' : 'Drag to move or re-seat'}
                   </span>
                 )}
               </div>

@@ -146,6 +146,14 @@ interface MaterialPreset {
   color: FloorColor
 }
 
+interface RoomThemePreset {
+  floorPatternIndex: number
+  floorColor: FloorColor
+  furnitureColor: FloorColor
+  label: string
+  wallColor: FloorColor
+}
+
 const FLOOR_MATERIAL_PRESETS: MaterialPreset[] = [
   { label: 'Oak', patternIndex: 1, color: { h: 34, s: 42, b: 8, c: 10 } },
   { label: 'Walnut', patternIndex: 2, color: { h: 24, s: 46, b: -18, c: 16 } },
@@ -166,10 +174,72 @@ const WALL_MATERIAL_PRESETS: MaterialPreset[] = [
   { label: 'Teal', color: { h: 182, s: 26, b: -8, c: 4 } },
 ]
 
-function MaterialPresetButton({ active, label, onClick, swatch }: {
+const ROOM_THEME_PRESETS: RoomThemePreset[] = [
+  {
+    label: 'Workshop',
+    floorPatternIndex: 2,
+    floorColor: { h: 28, s: 38, b: -6, c: 12 },
+    wallColor: { h: 32, s: 16, b: 12, c: -6 },
+    furnitureColor: { h: 20, s: 14, b: 8, c: 4 },
+  },
+  {
+    label: 'Gallery',
+    floorPatternIndex: 3,
+    floorColor: { h: 198, s: 10, b: -14, c: 6 },
+    wallColor: { h: 44, s: 12, b: 20, c: -10 },
+    furnitureColor: { h: 210, s: 8, b: -4, c: 8 },
+  },
+  {
+    label: 'Night Shift',
+    floorPatternIndex: 7,
+    floorColor: { h: 220, s: 34, b: -24, c: 10 },
+    wallColor: { h: 228, s: 24, b: -30, c: 18 },
+    furnitureColor: { h: 216, s: 28, b: -18, c: 10 },
+  },
+  {
+    label: 'Atrium',
+    floorPatternIndex: 6,
+    floorColor: { h: 124, s: 18, b: -16, c: 8 },
+    wallColor: { h: 108, s: 18, b: 10, c: -6 },
+    furnitureColor: { h: 112, s: 16, b: -10, c: 4 },
+  },
+  {
+    label: 'Sunset',
+    floorPatternIndex: 5,
+    floorColor: { h: 18, s: 48, b: 4, c: 6 },
+    wallColor: { h: 18, s: 24, b: 16, c: -8 },
+    furnitureColor: { h: 14, s: 34, b: -8, c: 6 },
+  },
+  {
+    label: 'Blueprint',
+    floorPatternIndex: 4,
+    floorColor: { h: 208, s: 14, b: -6, c: 2 },
+    wallColor: { h: 198, s: 20, b: 8, c: -4 },
+    furnitureColor: { h: 198, s: 18, b: -12, c: 8 },
+  },
+]
+
+const FURNITURE_COLOR_PRESETS: Array<{ color: FloorColor; label: string }> = [
+  { label: 'Ash', color: { h: 0, s: 0, b: 6, c: -4 } },
+  { label: 'Ink', color: { h: 224, s: 18, b: -24, c: 10 } },
+  { label: 'Moss', color: { h: 112, s: 20, b: -10, c: 4 } },
+  { label: 'Rosewood', color: { h: 8, s: 30, b: -10, c: 10 } },
+  { label: 'Copper', color: { h: 24, s: 36, b: 2, c: 8 } },
+  { label: 'Ice', color: { h: 196, s: 16, b: 10, c: -12 } },
+]
+
+const sectionLabelStyle: React.CSSProperties = {
+  fontSize: '16px',
+  color: 'rgba(255, 255, 255, 0.55)',
+  letterSpacing: '0.04em',
+  textTransform: 'uppercase',
+}
+
+function MaterialPresetButton({ active, label, onClick, secondarySwatch, swatch }: {
   active: boolean
   label: string
   onClick: () => void
+  secondarySwatch?: string
   swatch: string
 }) {
   return (
@@ -190,13 +260,29 @@ function MaterialPresetButton({ active, label, onClick, swatch }: {
     >
       <span
         style={{
-          width: 14,
+          width: secondarySwatch ? 18 : 14,
           height: 14,
-          background: swatch,
-          border: '1px solid rgba(255,255,255,0.2)',
+          display: 'grid',
+          gridTemplateColumns: secondarySwatch ? '1fr 1fr' : '1fr',
+          gap: 1,
           flexShrink: 0,
         }}
-      />
+      >
+        <span
+          style={{
+            background: swatch,
+            border: '1px solid rgba(255,255,255,0.2)',
+          }}
+        />
+        {secondarySwatch && (
+          <span
+            style={{
+              background: secondarySwatch,
+              border: '1px solid rgba(255,255,255,0.2)',
+            }}
+          />
+        )}
+      </span>
       {label}
     </button>
   )
@@ -267,6 +353,14 @@ export function EditorToolbar({
   const floorPatterns = Array.from({ length: patternCount }, (_, i) => i + 1)
   const activeFloorPresetKey = `${selectedTileType}:${floorColor.h}:${floorColor.s}:${floorColor.b}:${floorColor.c}`
   const activeWallPresetKey = `${wallColor.h}:${wallColor.s}:${wallColor.b}:${wallColor.c}`
+  const activeRoomThemeKey = ROOM_THEME_PRESETS.find((theme) =>
+    selectedTileType === theme.floorPatternIndex &&
+    colorsMatch(floorColor, theme.floorColor) &&
+    colorsMatch(wallColor, theme.wallColor),
+  )?.label ?? null
+  const activeFurniturePresetKey = FURNITURE_COLOR_PRESETS.find((preset) =>
+    colorsMatch(effectiveColor, preset.color),
+  )?.label ?? null
 
   const thumbSize = 36 // 2x for items
 
@@ -274,6 +368,14 @@ export function EditorToolbar({
   const isWallActive = activeTool === EditTool.WALL_PAINT
   const isEraseActive = activeTool === EditTool.ERASE
   const isFurnitureActive = activeTool === EditTool.FURNITURE_PLACE || activeTool === EditTool.FURNITURE_PICK
+  const applyRoomTheme = useCallback((theme: RoomThemePreset) => {
+    onTileTypeChange(theme.floorPatternIndex as TileTypeVal)
+    onFloorColorChange({ ...theme.floorColor })
+    onWallColorChange({ ...theme.wallColor })
+    if (selectedFurnitureUid) {
+      onSelectedFurnitureColorChange({ ...theme.furnitureColor })
+    }
+  }, [onFloorColorChange, onSelectedFurnitureColorChange, onTileTypeChange, onWallColorChange, selectedFurnitureUid])
 
   return (
     <div
@@ -323,6 +425,32 @@ export function EditorToolbar({
         >
           Furniture
         </button>
+      </div>
+
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column-reverse',
+          gap: 4,
+          padding: '4px 6px',
+          background: '#181828',
+          border: '2px solid #4a4a6a',
+          borderRadius: 0,
+        }}
+      >
+        <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 2 }}>
+          {ROOM_THEME_PRESETS.map((theme) => (
+            <MaterialPresetButton
+              key={theme.label}
+              active={activeRoomThemeKey === theme.label}
+              label={theme.label}
+              onClick={() => applyRoomTheme(theme)}
+              swatch={wallColorToHex(theme.floorColor)}
+              secondarySwatch={wallColorToHex(theme.wallColor)}
+            />
+          ))}
+        </div>
+        <div style={sectionLabelStyle}>Room Themes</div>
       </div>
 
       {/* Sub-panel: Floor tiles — stacked bottom-to-top via column-reverse */}
@@ -541,6 +669,30 @@ export function EditorToolbar({
               </button>
             )}
           </div>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column-reverse',
+              gap: 4,
+              padding: '4px 6px',
+              background: '#181828',
+              border: '2px solid #4a4a6a',
+              borderRadius: 0,
+            }}
+          >
+            <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 2 }}>
+              {FURNITURE_COLOR_PRESETS.map((preset) => (
+                <MaterialPresetButton
+                  key={preset.label}
+                  active={activeFurniturePresetKey === preset.label}
+                  label={preset.label}
+                  onClick={() => onSelectedFurnitureColorChange({ ...preset.color })}
+                  swatch={wallColorToHex(preset.color)}
+                />
+              ))}
+            </div>
+            <div style={sectionLabelStyle}>Furniture Tints</div>
+          </div>
           {showFurnitureColor && (
             <div style={{
               display: 'flex',
@@ -579,4 +731,12 @@ export function EditorToolbar({
       )}
     </div>
   )
+}
+
+function colorsMatch(left: FloorColor, right: FloorColor): boolean {
+  return left.h === right.h
+    && left.s === right.s
+    && left.b === right.b
+    && left.c === right.c
+    && Boolean(left.colorize) === Boolean(right.colorize)
 }

@@ -4,6 +4,7 @@ import { getCachedSprite, getOutlineSprite } from '../sprites/spriteCache.js'
 import { getCharacterSprites, BUBBLE_PERMISSION_SPRITE, BUBBLE_WAITING_SPRITE } from '../sprites/spriteData.js'
 import { getCharacterSprite } from './characters.js'
 import { renderMatrixEffect } from './matrixEffect.js'
+import { isWalkable } from '../layout/tileMap.js'
 import { getColorizedFloorSprite, hasFloorSprites, WALL_COLOR } from '../floorTiles.js'
 import { hasWallSprites, getWallInstances, wallColorToHex } from '../wallTiles.js'
 import {
@@ -190,39 +191,54 @@ export function renderScene(
 
 export function renderSeatIndicators(
   ctx: CanvasRenderingContext2D,
+  tileMap: TileTypeVal[][],
+  blockedTiles: Set<string>,
   seats: Map<string, Seat>,
   characters: Map<number, Character>,
   selectedAgentId: number | null,
+  draggingAgentId: number | null,
   hoveredTile: { col: number; row: number } | null,
   offsetX: number,
   offsetY: number,
   zoom: number,
 ): void {
-  if (selectedAgentId === null || !hoveredTile) return
-  const selectedChar = characters.get(selectedAgentId)
+  const previewAgentId = draggingAgentId ?? selectedAgentId
+  if (previewAgentId === null || !hoveredTile) return
+  const selectedChar = characters.get(previewAgentId)
   if (!selectedChar) return
 
-  // Only show indicator for the hovered seat tile
+  const s = TILE_SIZE * zoom
+  const x = offsetX + hoveredTile.col * s
+  const y = offsetY + hoveredTile.row * s
+
+  // Only show seat state for the hovered seat tile
   for (const [uid, seat] of seats) {
     if (seat.seatCol !== hoveredTile.col || seat.seatRow !== hoveredTile.row) continue
 
-    const s = TILE_SIZE * zoom
-    const x = offsetX + seat.seatCol * s
-    const y = offsetY + seat.seatRow * s
-
+    ctx.save()
     if (selectedChar.seatId === uid) {
-      // Selected agent's own seat — blue
       ctx.fillStyle = SEAT_OWN_COLOR
     } else if (!seat.assigned) {
-      // Available seat — green
       ctx.fillStyle = SEAT_AVAILABLE_COLOR
     } else {
-      // Busy (assigned to another agent) — red
       ctx.fillStyle = SEAT_BUSY_COLOR
     }
     ctx.fillRect(x, y, s, s)
-    break
+    ctx.restore()
+    return
   }
+
+  if (draggingAgentId === null) return
+
+  const canDrop = isWalkable(hoveredTile.col, hoveredTile.row, tileMap, blockedTiles)
+  ctx.save()
+  ctx.fillStyle = canDrop ? 'rgba(118, 204, 255, 0.18)' : 'rgba(255, 113, 113, 0.18)'
+  ctx.strokeStyle = canDrop ? SELECTION_HIGHLIGHT_COLOR : SEAT_BUSY_COLOR
+  ctx.lineWidth = 2
+  ctx.setLineDash(SELECTION_DASH_PATTERN)
+  ctx.fillRect(x, y, s, s)
+  ctx.strokeRect(x + 1, y + 1, s - 2, s - 2)
+  ctx.restore()
 }
 
 // ── Edit mode overlays ──────────────────────────────────────────
@@ -520,8 +536,10 @@ export interface EditorRenderState {
 
 export interface SelectionRenderState {
   selectedAgentId: number | null
+  draggingAgentId: number | null
   hoveredAgentId: number | null
   hoveredTile: { col: number; row: number } | null
+  blockedTiles: Set<string>
   seats: Map<string, Seat>
   characters: Map<number, Character>
 }
@@ -560,7 +578,19 @@ export function renderFrame(
 
   // Seat indicators (below furniture/characters, on top of floor)
   if (selection) {
-    renderSeatIndicators(ctx, selection.seats, selection.characters, selection.selectedAgentId, selection.hoveredTile, offsetX, offsetY, zoom)
+    renderSeatIndicators(
+      ctx,
+      tileMap,
+      selection.blockedTiles,
+      selection.seats,
+      selection.characters,
+      selection.selectedAgentId,
+      selection.draggingAgentId,
+      selection.hoveredTile,
+      offsetX,
+      offsetY,
+      zoom,
+    )
   }
 
   // Build wall instances for z-sorting with furniture and characters

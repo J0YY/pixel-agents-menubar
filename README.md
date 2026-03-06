@@ -1,13 +1,33 @@
 # Pixel Agents
 
+Fork-style continuation of [pablodelucca/pixel-agents](https://github.com/pablodelucca/pixel-agents).
+
 A pixel-art control room for your AI coding agents, available both as a VS Code extension and as a standalone macOS menubar app.
 
 Each active Claude Code or Codex session can spawn a character that walks around, sits at desks, and visually reflects what the agent is doing — typing when writing code, reading when searching files, waiting when it needs your attention.
 
 This repository contains the original [Pixel Agents extension for VS Code](https://marketplace.visualstudio.com/items?itemName=pablodelucca.pixel-agents) plus a new standalone desktop host for people who want Pixel Agents running without an IDE.
 
+If you mostly live in Terminal.app, iTerm, Warp, WezTerm, or a pile of shell windows instead of an IDE, this repo is the version built for that workflow.
+
 
 ![Pixel Agents screenshot](webview-ui/public/Screenshot.jpg)
+
+## Fork Lineage
+
+- Upstream project: [pablodelucca/pixel-agents](https://github.com/pablodelucca/pixel-agents)
+- This repo keeps the original VS Code extension workflow, but extends it into a standalone macOS desktop app and terminal-first session manager
+- GitHub does not currently show this repository as a native fork in the fork network, so the lineage is documented explicitly here and in the repository metadata
+
+## What Changed From Upstream
+
+- Added a standalone macOS menubar app so Pixel Agents can run without VS Code being open
+- Added external terminal detection for Claude Code and Codex sessions launched outside the VS Code integrated terminal
+- Added a desktop `Terminals` manager for focus, terminate, launch, rename, and reset-to-default session labels
+- Default terminal labels now use the detected working directory name when available instead of raw process IDs
+- Added richer office customization with room themes, floor/wall material presets, and furniture tint presets
+- Added direct dragging for characters so you can move them around the office or drop them onto empty seats
+- Preserved the original VS Code extension behavior as the compatibility baseline
 
 ## Features
 
@@ -16,7 +36,9 @@ This repository contains the original [Pixel Agents extension for VS Code](https
 - **Standalone macOS menubar app** — run Pixel Agents without VS Code and keep it watching your terminal sessions from the menu bar
 - **External terminal support on macOS** — detect Claude Code and Codex sessions running in normal terminal windows outside VS Code
 - **Terminal session manager** — inspect detected terminal-backed shell/agent sessions, focus them, and end them from the desktop app
+- **Human-readable terminal names** — detected sessions default to their working-folder name and can be renamed or reset from the desktop UI
 - **Office layout editor** — design your office with floors, walls, and furniture using a built-in editor
+- **Richer room themes** — bundled floor, wall, room, and furniture tint presets make the office easier to personalize quickly
 - **Speech bubbles** — visual indicators when an agent is waiting for input or needs permission
 - **Sound notifications** — optional chime when an agent finishes its turn
 - **Sub-agent visualization** — Task tool sub-agents spawn as separate characters linked to their parent
@@ -82,7 +104,7 @@ npm run menubar:pack
 2. Click the tray/menubar icon to show the office
 3. Use **+ Claude** or **+ Codex** to open new agent sessions in Terminal.app
 4. Use **Terminals** to inspect detected terminal-backed sessions running on your Mac
-5. Focus or end detected shell/agent sessions directly from the desktop app
+5. Focus, rename, reset, or end detected shell/agent sessions directly from the desktop app
 6. Close the window to send Pixel Agents back to the menu bar
 
 ## Standalone Menubar App
@@ -97,6 +119,7 @@ Desktop mode currently supports:
 - Listing terminal-backed shell/agent sessions in a terminal manager panel
 - Focusing a detected session's terminal app
 - Terminating a detected shell/agent process from the UI
+- Naming sessions by folder by default, with optional custom labels and reset-to-default behavior
 
 Desktop mode currently does **not** try to be a full terminal emulator or universal terminal automation layer. The first pass is a lightweight session manager.
 
@@ -133,11 +156,15 @@ Use the standard VS Code settings UI or `settings.json`:
 
 The built-in editor lets you design your office:
 
-- **Floor** — Full HSB color control
-- **Walls** — Auto-tiling walls with color customization
+- **Floor** — Full HSB color control plus bundled material presets
+- **Walls** — Auto-tiling walls with color customization and bundled wall materials
+- **Themes** — Room-wide presets for faster office restyling
+- **Furniture tints** — Quick tint presets for selected furniture pieces
 - **Tools** — Select, paint, erase, place, eyedropper, pick
 - **Undo/Redo** — 50 levels with Ctrl+Z / Ctrl+Y
 - **Export/Import** — Share layouts as JSON files via the Settings modal
+
+Characters can also be repositioned directly in the office view. Drag a person to an empty floor tile to move them, or drag them onto an empty chair to reassign their seat.
 
 The grid is expandable up to 64×64 tiles. Click the ghost border outside the current grid to grow it.
 

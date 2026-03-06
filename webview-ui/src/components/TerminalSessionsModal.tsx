@@ -3,6 +3,7 @@ import { useState } from 'react'
 export interface TerminalSession {
   commandLine: string
   cwd?: string
+  defaultLabel: string
   detail: string
   id: string
   kind: 'agent' | 'shell'
@@ -126,6 +127,7 @@ export function TerminalSessionsModal({
               const hoverKey = `session:${session.id}`
               const isHovered = hovered === hoverKey
               const isEditing = editingId === session.id
+              const hasCustomLabel = session.label !== session.defaultLabel
               return (
                 <div
                   key={session.id}
@@ -155,6 +157,7 @@ export function TerminalSessionsModal({
                         <input
                           autoFocus
                           value={draftLabel}
+                          placeholder={session.defaultLabel}
                           onChange={(e) => setDraftLabel(e.target.value)}
                           onBlur={() => {
                             onRenameSession(session.id, draftLabel)
@@ -212,6 +215,11 @@ export function TerminalSessionsModal({
                     <div style={{ fontSize: '15px', color: 'var(--pixel-text-dim)', marginBottom: 3 }}>
                       PID {session.pid}
                     </div>
+                    {hasCustomLabel && (
+                      <div style={{ fontSize: '14px', color: 'var(--pixel-text-dim)', marginBottom: 3 }}>
+                        Default name: {session.defaultLabel}
+                      </div>
+                    )}
                     <div
                       title={session.commandLine}
                       style={{
@@ -233,6 +241,19 @@ export function TerminalSessionsModal({
                     >
                       Rename
                     </button>
+                    {hasCustomLabel && (
+                      <button
+                        onClick={() => {
+                          onRenameSession(session.id, '')
+                          if (editingId === session.id) {
+                            setEditingId(null)
+                          }
+                        }}
+                        style={actionButtonStyle}
+                      >
+                        Reset
+                      </button>
+                    )}
                     <button
                       onClick={() => onFocusSession(session.id)}
                       style={actionButtonStyle}

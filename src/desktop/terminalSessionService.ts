@@ -8,6 +8,7 @@ import { DesktopStateStore } from './stateStore.js';
 interface TerminalSessionDto {
 	commandLine: string;
 	cwd?: string;
+	defaultLabel: string;
 	detail: string;
 	id: string;
 	kind: 'agent' | 'shell';
@@ -120,17 +121,21 @@ export class TerminalSessionService {
 
 	private buildSessionDtos(snapshots: ReturnType<typeof listTerminalSessions>): TerminalSessionDto[] {
 		const labelOverrides = this.stateStore.getTerminalLabelOverrides();
-		return snapshots.map((session) => ({
-			commandLine: session.commandLine,
-			cwd: session.cwd,
-			detail: buildSessionDetail(session.commandLine),
-			id: session.id,
-			kind: session.kind,
-			label: labelOverrides[session.id] ?? buildSessionLabel(session.kind, session.executable, session.cwd),
-			pid: session.pid,
-			runningFor: formatElapsedSeconds(session.elapsedSeconds),
-			terminalApp: session.terminalApp,
-		}));
+		return snapshots.map((session) => {
+			const defaultLabel = buildSessionDefaultLabel(session.kind, session.executable, session.cwd);
+			return {
+				commandLine: session.commandLine,
+				cwd: session.cwd,
+				defaultLabel,
+				detail: buildSessionDetail(session.commandLine),
+				id: session.id,
+				kind: session.kind,
+				label: labelOverrides[session.id] ?? defaultLabel,
+				pid: session.pid,
+				runningFor: formatElapsedSeconds(session.elapsedSeconds),
+				terminalApp: session.terminalApp,
+			};
+		});
 	}
 }
 
@@ -142,7 +147,7 @@ function buildSessionDetail(commandLine: string): string {
 	return `${compact.slice(0, 85)}...`;
 }
 
-function buildSessionLabel(kind: 'agent' | 'shell', executable: string, cwd?: string): string {
+function buildSessionDefaultLabel(kind: 'agent' | 'shell', executable: string, cwd?: string): string {
 	if (cwd) {
 		const folderName = path.basename(cwd);
 		if (folderName && folderName !== path.sep) {
