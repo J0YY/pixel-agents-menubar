@@ -1,7 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { getClaudeProjectsRoot } from '../../claudePaths.js';
-import { EXTERNAL_AGENT_RUNNING_GRACE_MS } from '../../constants.js';
 import type { PixelAgentsLogger } from '../logger.js';
 import type { AgentProvider } from '../provider.js';
 import { AgentRegistry } from '../registry.js';
@@ -205,14 +204,11 @@ export class ExternalClaudeProvider implements AgentProvider {
 	}
 
 	private toObservation(session: ExternalClaudeSession): AgentObservation {
-		const coarseState = Date.now() - session.firstSeenAt <= EXTERNAL_AGENT_RUNNING_GRACE_MS
-			? UNIFIED_AGENT_STATE.RUNNING
-			: UNIFIED_AGENT_STATE.IDLE;
 		const transcriptState = session.transcriptSnapshot.state;
 		const state = transcriptState === UNIFIED_AGENT_STATE.UNKNOWN
 			&& session.transcriptSnapshot.tools.length === 0
 			&& session.transcriptSnapshot.subagents.length === 0
-			? coarseState
+			? UNIFIED_AGENT_STATE.RUNNING
 			: transcriptState;
 
 		return {

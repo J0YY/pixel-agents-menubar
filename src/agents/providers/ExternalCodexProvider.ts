@@ -1,4 +1,3 @@
-import { EXTERNAL_AGENT_RUNNING_GRACE_MS } from '../../constants.js';
 import type { PixelAgentsLogger } from '../logger.js';
 import type { AgentProvider } from '../provider.js';
 import { AgentRegistry } from '../registry.js';
@@ -114,10 +113,6 @@ export class ExternalCodexProvider implements AgentProvider {
 	}
 
 	private toObservation(session: ExternalCodexSession): AgentObservation {
-		const state = Date.now() - session.firstSeenAt <= EXTERNAL_AGENT_RUNNING_GRACE_MS
-			? UNIFIED_AGENT_STATE.RUNNING
-			: UNIFIED_AGENT_STATE.IDLE;
-
 		return {
 			capabilities: {
 				closable: Boolean(this.options.terminalController),
@@ -133,7 +128,7 @@ export class ExternalCodexProvider implements AgentProvider {
 			providerId: this.id,
 			providerSessionId: session.providerSessionId,
 			source: AGENT_SOURCE.EXTERNAL_TERMINAL,
-			state,
+			state: UNIFIED_AGENT_STATE.RUNNING,
 			subagents: [],
 			tools: [],
 		};
