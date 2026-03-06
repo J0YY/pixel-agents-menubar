@@ -97,7 +97,7 @@ export function listTerminalSessions(processes: ProcessSnapshot[]): TerminalSess
 		candidates.set(processSnapshot.pid, {
 			commandLine: processSnapshot.commandLine,
 			elapsedSeconds: processSnapshot.elapsedSeconds,
-			executable: getProcessBaseName(processSnapshot.executable),
+			executable: getDisplayProcessName(processSnapshot),
 			id: `pid:${processSnapshot.pid}`,
 			kind,
 			pid: processSnapshot.pid,
@@ -179,4 +179,14 @@ function getProcessBaseName(executable: string): string {
 		.toLowerCase()
 		.replace(/^[^a-z0-9]+/, '')
 		.replace(/[^a-z0-9]+$/, '');
+}
+
+function getDisplayProcessName(processSnapshot: ProcessSnapshot): string {
+	const executableName = getProcessBaseName(processSnapshot.executable);
+	if (executableName) {
+		return executableName;
+	}
+
+	const commandBase = processSnapshot.commandLine.trim().split(/\s+/)[0] ?? '';
+	return getProcessBaseName(commandBase);
 }

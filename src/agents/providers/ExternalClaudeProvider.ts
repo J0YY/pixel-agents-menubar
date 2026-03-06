@@ -8,6 +8,7 @@ import { AgentRegistry } from '../registry.js';
 import { ProcessScanner } from '../processScanner.js';
 import type { TerminalController } from '../terminalController.js';
 import { ClaudeTranscriptWatcher } from '../claudeTranscriptWatcher.js';
+import { listTerminalSessions } from '../terminalProcessUtils.js';
 import { AGENT_FRAMEWORK, AGENT_SOURCE, UNIFIED_AGENT_STATE } from '../types.js';
 import type { AgentObservation } from '../types.js';
 
@@ -90,18 +91,19 @@ export class ExternalClaudeProvider implements AgentProvider {
 		const processes = await this.scanner.scan();
 		const observations: AgentObservation[] = [];
 		const liveSessionIds = new Set<string>();
+		const terminalSessions = listTerminalSessions(processes);
 
-		for (const processSnapshot of processes) {
-			if (!isClaudeProcess(processSnapshot.commandLine, processSnapshot.executable)) {
+		for (const terminalSession of terminalSessions) {
+			if (terminalSession.kind !== 'agent' || !isClaudeProcess(terminalSession.commandLine, terminalSession.executable)) {
 				continue;
 			}
 
-			const providerSessionId = `pid:${processSnapshot.pid}`;
+			const providerSessionId = `pid:${terminalSession.pid}`;
 			liveSessionIds.add(providerSessionId);
-			const session = this.getOrCreateSession(providerSessionId, processSnapshot.pid);
-			session.commandLine = processSnapshot.commandLine;
-			session.elapsedSeconds = processSnapshot.elapsedSeconds;
-			session.sessionId = extractSessionId(processSnapshot.commandLine) ?? session.sessionId;
+			const session = this.getOrCreateSession(providerSessionId, terminalSession.pid);
+			session.commandLine = terminalSession.commandLine;
+			session.elapsedSeconds = terminalSession.elapsedSeconds;
+			session.sessionId = extractSessionId(terminalSession.commandLine) ?? session.sessionId;
 
 			if (this.options.enableTranscriptCorrelation && session.sessionId && !session.transcriptPath) {
 				session.transcriptPath = this.findTranscriptPath(session.sessionId);

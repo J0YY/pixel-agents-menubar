@@ -4,6 +4,7 @@ import type { AgentProvider } from '../provider.js';
 import { AgentRegistry } from '../registry.js';
 import { ProcessScanner } from '../processScanner.js';
 import type { TerminalController } from '../terminalController.js';
+import { listTerminalSessions } from '../terminalProcessUtils.js';
 import { AGENT_FRAMEWORK, AGENT_SOURCE, UNIFIED_AGENT_STATE } from '../types.js';
 import type { AgentObservation } from '../types.js';
 
@@ -72,16 +73,17 @@ export class ExternalCodexProvider implements AgentProvider {
 		const processes = await this.scanner.scan();
 		const observations: AgentObservation[] = [];
 		const liveSessionIds = new Set<string>();
+		const terminalSessions = listTerminalSessions(processes);
 
-		for (const processSnapshot of processes) {
-			if (!isCodexProcess(processSnapshot.commandLine, processSnapshot.executable)) {
+		for (const terminalSession of terminalSessions) {
+			if (terminalSession.kind !== 'agent' || !isCodexProcess(terminalSession.commandLine, terminalSession.executable)) {
 				continue;
 			}
 
-			const providerSessionId = `pid:${processSnapshot.pid}`;
+			const providerSessionId = `pid:${terminalSession.pid}`;
 			liveSessionIds.add(providerSessionId);
-			const session = this.getOrCreateSession(providerSessionId, processSnapshot.pid);
-			session.commandLine = processSnapshot.commandLine;
+			const session = this.getOrCreateSession(providerSessionId, terminalSession.pid);
+			session.commandLine = terminalSession.commandLine;
 			observations.push(this.toObservation(session));
 		}
 

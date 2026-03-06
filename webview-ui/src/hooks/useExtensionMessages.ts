@@ -177,10 +177,19 @@ export function useExtensionMessages(
         const meta = (msg.agentMeta || {}) as Record<number, { palette?: number; hueShift?: number; seatId?: string }>
         const folderNames = (msg.folderNames || {}) as Record<number, string>
         const capabilities = (msg.agentCapabilities || {}) as Record<number, AgentCapabilities>
-        // Buffer agents — they'll be added in layoutLoaded after seats are built
-        for (const id of incoming) {
-          const m = meta[id]
-          pendingAgents.push({ id, palette: m?.palette, hueShift: m?.hueShift, seatId: m?.seatId, folderName: folderNames[id] })
+        if (!layoutReadyRef.current) {
+          for (const id of incoming) {
+            const m = meta[id]
+            pendingAgents.push({ id, palette: m?.palette, hueShift: m?.hueShift, seatId: m?.seatId, folderName: folderNames[id] })
+          }
+        } else {
+          for (const id of incoming) {
+            const m = meta[id]
+            os.addAgent(id, m?.palette, m?.hueShift, m?.seatId, true, folderNames[id])
+          }
+          if (incoming.length > 0) {
+            saveAgentSeats(os)
+          }
         }
         setAgentCapabilities((prev) => ({ ...prev, ...capabilities }))
         setAgents((prev) => {
