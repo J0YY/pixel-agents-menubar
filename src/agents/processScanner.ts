@@ -23,7 +23,7 @@ export class ProcessScanner {
 		}
 
 		try {
-			const { stdout } = await execFileAsync('ps', ['-axo', 'pid=,ppid=,etimes=,comm=,command=']);
+			const { stdout } = await execFileAsync('ps', ['-axo', 'pid=,ppid=,etime=,comm=,command=']);
 			const processes = parsePsOutput(stdout);
 			this.cachedProcesses = processes;
 			this.cachedAt = now;
@@ -44,14 +44,19 @@ function parsePsOutput(stdout: string): ProcessSnapshot[] {
 			continue;
 		}
 
-		const match = line.match(/^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/);
+		const match = line.match(/^\s*(\d+)\s+(\d+)\s+(\S+)\s+(\S+)\s+(.*)$/);
 		if (!match) {
+			continue;
+		}
+
+		const elapsedSeconds = parseElapsedTime(match[3]);
+		if (elapsedSeconds === null) {
 			continue;
 		}
 
 		processes.push({
 			commandLine: match[5],
-			elapsedSeconds: Number.parseInt(match[3], 10),
+			elapsedSeconds,
 			executable: match[4],
 			pid: Number.parseInt(match[1], 10),
 			ppid: Number.parseInt(match[2], 10),
@@ -61,3 +66,33 @@ function parsePsOutput(stdout: string): ProcessSnapshot[] {
 	return processes;
 }
 
+function parseElapsedTime(rawValue: string): number | null {
+	const trimmed = rawValue.trim();
+	const daySplit = trimmed.split('-');
+	const timePart = daySplit[daySplit.length - 1];
+	const dayCount = daySplit.length === 2 ? Number.parseInt(daySplit[0], 10) : 0;
+	if (!Number.isFinite(dayCount)) {
+		return null;
+	}
+
+	const segments = timePart.split(':').map((segment) => Number.parseInt(segment, 10));
+	if (segments.some((segment) => !Number.isFinite(segment))) {
+		return null;
+	}
+
+	let hours = 0;
+	let minutes = 0;
+	let seconds = 0;
+
+	if (segments.length === 3) {
+		[hours, minutes, seconds] = segments;
+	} else if (segments.length === 2) {
+		[minutes, seconds] = segments;
+	} else if (segments.length === 1) {
+		[seconds] = segments;
+	} else {
+		return null;
+	}
+
+	return (((dayCount * 24) + hours) * 60 + minutes) * 60 + seconds;
+}

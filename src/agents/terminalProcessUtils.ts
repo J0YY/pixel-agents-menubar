@@ -175,5 +175,8 @@ function isShellProcess(processSnapshot: ProcessSnapshot): boolean {
 
 function getProcessBaseName(executable: string): string {
 	const normalized = executable.split('/').pop() ?? executable;
-	return normalized.toLowerCase();
+	return normalized
+		.toLowerCase()
+		.replace(/^[^a-z0-9]+/, '')
+		.replace(/[^a-z0-9]+$/, '');
 }
