@@ -319,6 +319,7 @@ function App() {
             onWallColorChange={editor.handleWallColorChange}
             onSelectedFurnitureColorChange={editor.handleSelectedFurnitureColorChange}
             onFurnitureTypeChange={editor.handleFurnitureTypeChange}
+            onApplyLayoutTemplate={editor.handleApplyLayoutTemplate}
             loadedAssets={loadedAssets}
           />
         )

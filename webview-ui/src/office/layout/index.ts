@@ -7,9 +7,12 @@ export {
   layoutToSeats,
   getSeatTiles,
   createDefaultLayout,
+  createLayoutTemplate,
+  ROOM_LAYOUT_TEMPLATES,
   serializeLayout,
   deserializeLayout,
 } from './layoutSerializer.js'
+export type { RoomLayoutTemplateId } from './layoutSerializer.js'
 export {
   isWalkable,
   getWalkableTiles,

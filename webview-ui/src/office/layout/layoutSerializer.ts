@@ -209,62 +209,211 @@ const DEFAULT_LEFT_ROOM_COLOR: FloorColor = { h: 35, s: 30, b: 15, c: 0 }  // wa
 const DEFAULT_RIGHT_ROOM_COLOR: FloorColor = { h: 25, s: 45, b: 5, c: 10 }  // warm brown
 const DEFAULT_CARPET_COLOR: FloorColor = { h: 280, s: 40, b: -5, c: 0 }     // purple
 const DEFAULT_DOORWAY_COLOR: FloorColor = { h: 35, s: 25, b: 10, c: 0 }     // tan
+const DEFAULT_STUDIO_COLOR: FloorColor = { h: 196, s: 14, b: -8, c: 4 }
+const DEFAULT_COURTYARD_COLOR: FloorColor = { h: 126, s: 18, b: -14, c: 6 }
+const DEFAULT_LOUNGE_COLOR: FloorColor = { h: 202, s: 10, b: -18, c: 10 }
 
-/** Create the default office layout matching the current hardcoded office */
+type DeskSide = 'top' | 'bottom' | 'left' | 'right'
+
+interface FloorZone {
+  left: number
+  right: number
+  top: number
+  bottom: number
+  tile: TileTypeVal
+  color: FloorColor
+}
+
+export const ROOM_LAYOUT_TEMPLATES = [
+  { id: 'split-office', label: 'Split Office', description: 'Two connected wings with desk stations in each room.' },
+  { id: 'studio-loft', label: 'Studio Loft', description: 'An open L-shaped room with a single shared floor.' },
+  { id: 'courtyard-ring', label: 'Courtyard Ring', description: 'A ring-shaped office with an interior courtyard void.' },
+] as const
+
+export type RoomLayoutTemplateId = (typeof ROOM_LAYOUT_TEMPLATES)[number]['id']
+
+/** Create the default office layout with one desk setup per agent seat. */
 export function createDefaultLayout(): OfficeLayout {
-  const W = TileType.WALL
-  const F1 = TileType.FLOOR_1
-  const F2 = TileType.FLOOR_2
-  const F3 = TileType.FLOOR_3
-  const F4 = TileType.FLOOR_4
+  return createLayoutTemplate('split-office')
+}
 
-  const tiles: TileTypeVal[] = []
-  const tileColors: Array<FloorColor | null> = []
+export function createLayoutTemplate(templateId: RoomLayoutTemplateId): OfficeLayout {
+  switch (templateId) {
+    case 'studio-loft':
+      return createStudioLoftLayout()
+    case 'courtyard-ring':
+      return createCourtyardRingLayout()
+    case 'split-office':
+    default:
+      return createSplitOfficeLayout()
+  }
+}
 
-  for (let r = 0; r < DEFAULT_ROWS; r++) {
-    for (let c = 0; c < DEFAULT_COLS; c++) {
-      if (r === 0 || r === DEFAULT_ROWS - 1) { tiles.push(W); tileColors.push(null); continue }
-      if (c === 0 || c === DEFAULT_COLS - 1) { tiles.push(W); tileColors.push(null); continue }
-      if (c === 10) {
-        if (r >= 4 && r <= 6) {
-          tiles.push(F4); tileColors.push(DEFAULT_DOORWAY_COLOR)
-        } else {
-          tiles.push(W); tileColors.push(null)
-        }
-        continue
-      }
-      if (c >= 15 && c <= 18 && r >= 7 && r <= 9) {
-        tiles.push(F3); tileColors.push(DEFAULT_CARPET_COLOR); continue
-      }
-      if (c < 10) {
-        tiles.push(F1); tileColors.push(DEFAULT_LEFT_ROOM_COLOR)
-      } else {
-        tiles.push(F2); tileColors.push(DEFAULT_RIGHT_ROOM_COLOR)
+function createSplitOfficeLayout(): OfficeLayout {
+  const zones: FloorZone[] = [
+    { left: 1, top: 1, right: 9, bottom: 19, tile: TileType.FLOOR_1, color: DEFAULT_LEFT_ROOM_COLOR },
+    { left: 11, top: 1, right: 19, bottom: 19, tile: TileType.FLOOR_2, color: DEFAULT_RIGHT_ROOM_COLOR },
+    { left: 10, top: 9, right: 10, bottom: 11, tile: TileType.FLOOR_4, color: DEFAULT_DOORWAY_COLOR },
+    { left: 14, top: 13, right: 18, bottom: 17, tile: TileType.FLOOR_3, color: DEFAULT_CARPET_COLOR },
+  ]
+
+  const furniture: PlacedFurniture[] = [
+    ...buildDeskStation('split-left-a', 2, 2, 'top'),
+    ...buildDeskStation('split-left-b', 6, 2, 'top'),
+    ...buildDeskStation('split-left-c', 2, 8, 'bottom'),
+    ...buildDeskStation('split-left-d', 6, 8, 'bottom'),
+    ...buildDeskStation('split-right-a', 12, 2, 'top'),
+    ...buildDeskStation('split-right-b', 15, 2, 'top'),
+    ...buildDeskStation('split-right-c', 12, 8, 'bottom'),
+    ...buildDeskStation('split-right-d', 15, 8, 'bottom'),
+    { uid: 'split-bookshelf', type: FurnitureType.BOOKSHELF, col: 1, row: 14 },
+    { uid: 'split-plant-left', type: FurnitureType.PLANT, col: 8, row: 17 },
+    { uid: 'split-cooler', type: FurnitureType.COOLER, col: 17, row: 14 },
+    { uid: 'split-plant-right', type: FurnitureType.PLANT, col: 18, row: 17 },
+  ]
+
+  return createLayoutFromZones(DEFAULT_COLS, DEFAULT_ROWS, zones, furniture)
+}
+
+function createStudioLoftLayout(): OfficeLayout {
+  const zones: FloorZone[] = [
+    { left: 1, top: 1, right: 14, bottom: 16, tile: TileType.FLOOR_6, color: DEFAULT_STUDIO_COLOR },
+    { left: 15, top: 7, right: 22, bottom: 16, tile: TileType.FLOOR_7, color: DEFAULT_LOUNGE_COLOR },
+    { left: 3, top: 4, right: 12, bottom: 6, tile: TileType.FLOOR_4, color: DEFAULT_DOORWAY_COLOR },
+  ]
+
+  const furniture: PlacedFurniture[] = [
+    ...buildDeskStation('studio-a', 3, 2, 'top'),
+    ...buildDeskStation('studio-b', 7, 2, 'top'),
+    ...buildDeskStation('studio-c', 11, 2, 'top'),
+    ...buildDeskStation('studio-d', 3, 9, 'bottom'),
+    ...buildDeskStation('studio-e', 7, 9, 'bottom'),
+    ...buildDeskStation('studio-f', 16, 10, 'right'),
+    { uid: 'studio-bookshelf', type: FurnitureType.BOOKSHELF, col: 21, row: 8 },
+    { uid: 'studio-cooler', type: FurnitureType.COOLER, col: 20, row: 14 },
+    { uid: 'studio-plant-a', type: FurnitureType.PLANT, col: 2, row: 14 },
+    { uid: 'studio-plant-b', type: FurnitureType.PLANT, col: 13, row: 14 },
+  ]
+
+  return createLayoutFromZones(24, 18, zones, furniture)
+}
+
+function createCourtyardRingLayout(): OfficeLayout {
+  const zones: FloorZone[] = [
+    { left: 1, top: 1, right: 23, bottom: 17, tile: TileType.FLOOR_6, color: DEFAULT_COURTYARD_COLOR },
+    { left: 4, top: 4, right: 20, bottom: 14, tile: TileType.FLOOR_7, color: DEFAULT_LOUNGE_COLOR },
+  ]
+
+  const courtyardVoid = createVoidZone(8, 6, 16, 12)
+  const furniture: PlacedFurniture[] = [
+    ...buildDeskStation('court-a', 3, 2, 'top'),
+    ...buildDeskStation('court-b', 7, 2, 'top'),
+    ...buildDeskStation('court-c', 15, 2, 'top'),
+    ...buildDeskStation('court-d', 19, 2, 'top'),
+    ...buildDeskStation('court-e', 3, 13, 'bottom'),
+    ...buildDeskStation('court-f', 7, 13, 'bottom'),
+    ...buildDeskStation('court-g', 15, 13, 'bottom'),
+    ...buildDeskStation('court-h', 19, 13, 'bottom'),
+    { uid: 'court-cooler', type: FurnitureType.COOLER, col: 22, row: 9 },
+    { uid: 'court-bookshelf', type: FurnitureType.BOOKSHELF, col: 1, row: 8 },
+    { uid: 'court-plant-a', type: FurnitureType.PLANT, col: 5, row: 16 },
+    { uid: 'court-plant-b', type: FurnitureType.PLANT, col: 19, row: 16 },
+  ]
+
+  return createLayoutFromZones(25, 19, zones, furniture, courtyardVoid)
+}
+
+function createLayoutFromZones(
+  cols: number,
+  rows: number,
+  zones: FloorZone[],
+  furniture: PlacedFurniture[],
+  voidKeys: Set<string> = new Set(),
+): OfficeLayout {
+  const tiles: TileTypeVal[] = new Array(cols * rows).fill(TileType.VOID)
+  const tileColors: Array<FloorColor | null> = new Array(cols * rows).fill(null)
+  const floorKeys = new Set<string>()
+
+  for (const zone of zones) {
+    for (let row = zone.top; row <= zone.bottom; row++) {
+      for (let col = zone.left; col <= zone.right; col++) {
+        const key = `${col},${row}`
+        if (voidKeys.has(key)) continue
+        const idx = row * cols + col
+        tiles[idx] = zone.tile
+        tileColors[idx] = zone.color
+        floorKeys.add(key)
       }
     }
   }
 
-  const furniture: PlacedFurniture[] = [
-    { uid: 'desk-left', type: FurnitureType.DESK, col: 4, row: 3 },
-    { uid: 'desk-right', type: FurnitureType.DESK, col: 13, row: 3 },
-    { uid: 'bookshelf-1', type: FurnitureType.BOOKSHELF, col: 1, row: 5 },
-    { uid: 'plant-left', type: FurnitureType.PLANT, col: 1, row: 1 },
-    { uid: 'cooler-1', type: FurnitureType.COOLER, col: 17, row: 7 },
-    { uid: 'plant-right', type: FurnitureType.PLANT, col: 18, row: 1 },
-    { uid: 'whiteboard-1', type: FurnitureType.WHITEBOARD, col: 15, row: 0 },
-    // Left desk chairs
-    { uid: 'chair-l-top', type: FurnitureType.CHAIR, col: 4, row: 2 },
-    { uid: 'chair-l-bottom', type: FurnitureType.CHAIR, col: 5, row: 5 },
-    { uid: 'chair-l-left', type: FurnitureType.CHAIR, col: 3, row: 4 },
-    { uid: 'chair-l-right', type: FurnitureType.CHAIR, col: 6, row: 3 },
-    // Right desk chairs
-    { uid: 'chair-r-top', type: FurnitureType.CHAIR, col: 13, row: 2 },
-    { uid: 'chair-r-bottom', type: FurnitureType.CHAIR, col: 14, row: 5 },
-    { uid: 'chair-r-left', type: FurnitureType.CHAIR, col: 12, row: 4 },
-    { uid: 'chair-r-right', type: FurnitureType.CHAIR, col: 15, row: 3 },
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const idx = row * cols + col
+      if (tiles[idx] !== TileType.VOID) continue
+      if (hasAdjacentFloor(col, row, floorKeys)) {
+        tiles[idx] = TileType.WALL
+      }
+    }
+  }
+
+  return { version: 1, cols, rows, tiles, tileColors, furniture }
+}
+
+function hasAdjacentFloor(col: number, row: number, floorKeys: Set<string>): boolean {
+  return floorKeys.has(`${col},${row - 1}`)
+    || floorKeys.has(`${col + 1},${row}`)
+    || floorKeys.has(`${col},${row + 1}`)
+    || floorKeys.has(`${col - 1},${row}`)
+}
+
+function createVoidZone(left: number, top: number, right: number, bottom: number): Set<string> {
+  const keys = new Set<string>()
+  for (let row = top; row <= bottom; row++) {
+    for (let col = left; col <= right; col++) {
+      keys.add(`${col},${row}`)
+    }
+  }
+  return keys
+}
+
+function buildDeskStation(uid: string, deskCol: number, deskRow: number, chairSide: DeskSide): PlacedFurniture[] {
+  const station: PlacedFurniture[] = [
+    { uid: `${uid}-desk`, type: FurnitureType.DESK, col: deskCol, row: deskRow },
+    { uid: `${uid}-pc`, type: FurnitureType.PC, col: deskCol + getPcOffset(chairSide).col, row: deskRow + getPcOffset(chairSide).row },
   ]
 
-  return { version: 1, cols: DEFAULT_COLS, rows: DEFAULT_ROWS, tiles, tileColors, furniture }
+  const chairPosition = getChairPosition(deskCol, deskRow, chairSide)
+  station.push({ uid: `${uid}-chair`, type: FurnitureType.CHAIR, col: chairPosition.col, row: chairPosition.row })
+  return station
+}
+
+function getChairPosition(deskCol: number, deskRow: number, chairSide: DeskSide): { col: number; row: number } {
+  switch (chairSide) {
+    case 'bottom':
+      return { col: deskCol, row: deskRow + 2 }
+    case 'left':
+      return { col: deskCol - 1, row: deskRow }
+    case 'right':
+      return { col: deskCol + 2, row: deskRow }
+    case 'top':
+    default:
+      return { col: deskCol, row: deskRow - 1 }
+  }
+}
+
+function getPcOffset(chairSide: DeskSide): { col: number; row: number } {
+  switch (chairSide) {
+    case 'bottom':
+      return { col: 1, row: 0 }
+    case 'left':
+      return { col: 1, row: 1 }
+    case 'right':
+      return { col: 0, row: 1 }
+    case 'top':
+    default:
+      return { col: 1, row: 0 }
+  }
 }
 
 /** Serialize layout to JSON string */

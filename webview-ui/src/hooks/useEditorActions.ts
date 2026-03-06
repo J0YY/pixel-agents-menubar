@@ -7,6 +7,8 @@ import type { OfficeLayout, EditTool as EditToolType, TileType as TileTypeVal, F
 import { paintTile, placeFurniture, removeFurniture, moveFurniture, rotateFurniture, toggleFurnitureState, canPlaceFurniture, getWallPlacementRow, expandLayout } from '../office/editor/editorActions.js'
 import type { ExpandDirection } from '../office/editor/editorActions.js'
 import { getCatalogEntry, getRotatedType, getToggledType } from '../office/layout/furnitureCatalog.js'
+import { createLayoutTemplate } from '../office/layout/index.js'
+import type { RoomLayoutTemplateId } from '../office/layout/index.js'
 import { defaultZoom } from '../office/toolUtils.js'
 import { vscode } from '../vscodeApi.js'
 import { LAYOUT_SAVE_DEBOUNCE_MS, ZOOM_MIN, ZOOM_MAX } from '../constants.js'
@@ -34,6 +36,7 @@ export interface EditorActions {
   handleRedo: () => void
   handleReset: () => void
   handleSave: () => void
+  handleApplyLayoutTemplate: (templateId: RoomLayoutTemplateId) => void
   handleZoomChange: (zoom: number) => void
   handleEditorTileAction: (col: number, row: number) => void
   handleEditorEraseAction: (col: number, row: number) => void
@@ -308,6 +311,16 @@ export function useEditorActions(
     setIsDirty(false)
   }, [getOfficeState, editorState])
 
+  const handleApplyLayoutTemplate = useCallback((templateId: RoomLayoutTemplateId) => {
+    const newLayout = createLayoutTemplate(templateId)
+    applyEdit(newLayout)
+    editorState.clearSelection()
+    editorState.clearGhost()
+    editorState.clearDrag()
+    colorEditUidRef.current = null
+    wallColorEditActiveRef.current = false
+  }, [applyEdit, editorState])
+
   // Notify React that imperative editor selection changed (e.g., from OfficeCanvas mouseUp)
   const handleEditorSelectionChange = useCallback(() => {
     colorEditUidRef.current = null
@@ -518,6 +531,7 @@ export function useEditorActions(
     handleRedo,
     handleReset,
     handleSave,
+    handleApplyLayoutTemplate,
     handleZoomChange,
     handleEditorTileAction,
     handleEditorEraseAction,

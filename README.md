@@ -26,6 +26,8 @@ If you mostly live in Terminal.app, iTerm, Warp, WezTerm, or a pile of shell win
 - Added a desktop `Terminals` manager for focus, terminate, launch, rename, and reset-to-default session labels
 - Default terminal labels now use the detected working directory name when available instead of raw process IDs
 - Added richer office customization with room themes, floor/wall material presets, and furniture tint presets
+- Added multiple built-in room layout templates, including non-rectangular room shapes
+- Default layouts now give each agent a dedicated desk setup with a computer instead of clustering multiple agents around one shared desk
 - Added direct dragging for characters so you can move them around the office or drop them onto empty seats
 - Preserved the original VS Code extension behavior as the compatibility baseline
 
@@ -159,12 +161,14 @@ The built-in editor lets you design your office:
 - **Floor** — Full HSB color control plus bundled material presets
 - **Walls** — Auto-tiling walls with color customization and bundled wall materials
 - **Themes** — Room-wide presets for faster office restyling
+- **Room layouts** — Built-in layout templates with different room shapes
 - **Furniture tints** — Quick tint presets for selected furniture pieces
 - **Tools** — Select, paint, erase, place, eyedropper, pick
 - **Undo/Redo** — 50 levels with Ctrl+Z / Ctrl+Y
 - **Export/Import** — Share layouts as JSON files via the Settings modal
 
 Characters can also be repositioned directly in the office view. Drag a person to an empty floor tile to move them, or drag them onto an empty chair to reassign their seat.
+By default, the built-in layouts give each spawned agent a nearby desk and computer station to work at.
 
 The grid is expandable up to 64×64 tiles. Click the ghost border outside the current grid to grow it.
 

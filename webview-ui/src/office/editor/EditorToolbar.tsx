@@ -3,6 +3,8 @@ import { EditTool } from '../types.js'
 import type { TileType as TileTypeVal, FloorColor } from '../types.js'
 import { getCatalogByCategory, buildDynamicCatalog, getActiveCategories } from '../layout/furnitureCatalog.js'
 import type { FurnitureCategory, LoadedAssetData } from '../layout/furnitureCatalog.js'
+import { ROOM_LAYOUT_TEMPLATES } from '../layout/index.js'
+import type { RoomLayoutTemplateId } from '../layout/index.js'
 import { getCachedSprite } from '../sprites/spriteCache.js'
 import { getColorizedFloorSprite, getFloorPatternCount, hasFloorSprites } from '../floorTiles.js'
 import { wallColorToHex } from '../wallTiles.js'
@@ -55,6 +57,7 @@ interface EditorToolbarProps {
   onWallColorChange: (color: FloorColor) => void
   onSelectedFurnitureColorChange: (color: FloorColor | null) => void
   onFurnitureTypeChange: (type: string) => void
+  onApplyLayoutTemplate: (templateId: RoomLayoutTemplateId) => void
   loadedAssets?: LoadedAssetData
 }
 
@@ -302,6 +305,7 @@ export function EditorToolbar({
   onWallColorChange,
   onSelectedFurnitureColorChange,
   onFurnitureTypeChange,
+  onApplyLayoutTemplate,
   loadedAssets,
 }: EditorToolbarProps) {
   const [activeCategory, setActiveCategory] = useState<FurnitureCategory>('desks')
@@ -425,6 +429,32 @@ export function EditorToolbar({
         >
           Furniture
         </button>
+      </div>
+
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column-reverse',
+          gap: 4,
+          padding: '4px 6px',
+          background: '#181828',
+          border: '2px solid #4a4a6a',
+          borderRadius: 0,
+        }}
+      >
+        <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 2 }}>
+          {ROOM_LAYOUT_TEMPLATES.map((template) => (
+            <MaterialPresetButton
+              key={template.id}
+              active={false}
+              label={template.label}
+              onClick={() => onApplyLayoutTemplate(template.id)}
+              swatch="#50657A"
+              secondarySwatch="#8EA98F"
+            />
+          ))}
+        </div>
+        <div style={sectionLabelStyle}>Room Layouts</div>
       </div>
 
       <div
